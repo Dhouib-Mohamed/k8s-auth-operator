@@ -1,0 +1,4 @@
+## Append samples of your project ##
+resources:
+- context_v1_context.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples

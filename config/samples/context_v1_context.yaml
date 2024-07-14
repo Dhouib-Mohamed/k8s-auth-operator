@@ -1,0 +1,12 @@
+apiVersion: context.kube-auth/v1
+kind: Context
+metadata:
+  labels:
+    app.kubernetes.io/name: k8s-auth-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: context-sample
+spec:
+  find:
+    - "kube-*"
+  namespaces:
+    - "test"
