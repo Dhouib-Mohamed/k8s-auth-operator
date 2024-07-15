@@ -1,0 +1,27 @@
+# permissions for end users to edit roles.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: k8s-auth-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: role-editor-role
+rules:
+- apiGroups:
+  - context.kube-auth
+  resources:
+  - roles
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - context.kube-auth
+  resources:
+  - roles/status
+  verbs:
+  - get

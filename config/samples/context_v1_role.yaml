@@ -1,0 +1,22 @@
+apiVersion: context.kube-auth/v1
+kind: Role
+metadata:
+  labels:
+    app.kubernetes.io/name: k8s-auth-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: role-sample
+spec:
+  namespaceRole:
+    create: true
+    delete: false
+  clusterRole:
+    -  namespaces: ["default"]
+       verbs: ["get", "list"]
+       contexts: []
+       exclude:
+          resources: []
+          instances: []
+       include:
+         resources: ["pods", "namespaces"]
+         instances: []
+

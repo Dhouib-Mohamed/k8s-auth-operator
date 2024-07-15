@@ -18,12 +18,10 @@ package controller
 
 import (
 	"context"
-	errorsHandler "errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	contextv1 "kube-auth.io/api/v1"
-	"regexp"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -41,7 +39,7 @@ type ContextReconciler struct {
 //+kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch
 
 func (r *ContextReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := log.FromContext(ctx)
+	logger := log.FromContext(ctx)
 
 	// Fetch the NamespaceContext instance
 	namespaceContext := &contextv1.Context{}
@@ -66,17 +64,17 @@ func (r *ContextReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	matchedNamespaces := []string{}
 
 	if err := checkNamespaces(namespaceList.Items, namespaceContext.Spec.Namespaces, &matchedNamespaces); err != nil {
-		log.Error(err, "Namespace not found")
+		logger.Error(err, "Namespace not found")
 		return ctrl.Result{}, nil
 	}
 
 	if err := findNamespaces(namespaceList.Items, namespaceContext.Spec.Find, &matchedNamespaces); err != nil {
-		log.Error(err, "Error finding namespaces")
+		logger.Error(err, "Error finding namespaces")
 		return ctrl.Result{}, nil
 	}
 
 	if len(matchedNamespaces) == 0 {
-		log.Info("No namespaces found")
+		logger.Info("No namespaces found")
 		return ctrl.Result{}, nil
 	}
 
@@ -96,45 +94,4 @@ func (r *ContextReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&contextv1.Context{}).
 		//Watches(&source.Kind{Type: &corev1.Namespace{}}, &handler.EnqueueRequestForObject{}).
 		Complete(r)
-}
-
-func checkNamespaces(AllNamespaces []corev1.Namespace, namespaceList []string, matchedNamespaces *[]string) error {
-	for _, ns := range namespaceList {
-		found := false
-		for _, allNs := range AllNamespaces {
-			if ns == allNs.Name {
-				found = true
-				appendNamespace(matchedNamespaces, ns)
-				break
-			}
-		}
-		if !found {
-			return errorsHandler.New("Namespace not found")
-		}
-	}
-	return nil
-}
-
-func findNamespaces(allNamespaces []corev1.Namespace, namespaceFind []string, matchedNamespaces *[]string) error {
-	for _, find := range namespaceFind {
-		regex, err := regexp.Compile(find)
-		if err != nil {
-			return err
-		}
-		for _, ns := range allNamespaces {
-			if regex.MatchString(ns.Name) {
-				appendNamespace(matchedNamespaces, ns.Name)
-			}
-		}
-	}
-	return nil
-}
-
-func appendNamespace(matchedNamespaces *[]string, namespace string) {
-	for _, ns := range *matchedNamespaces {
-		if ns == namespace {
-			return
-		}
-	}
-	*matchedNamespaces = append(*matchedNamespaces, namespace)
 }

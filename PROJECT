@@ -17,4 +17,13 @@ resources:
   kind: Context
   path: kube-auth.io/api/v1
   version: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: kube-auth
+  group: context
+  kind: Role
+  path: kube-auth.io/api/v1
+  version: v1
 version: "3"

@@ -13,6 +13,16 @@ rules:
   - list
   - watch
 - apiGroups:
+  - ""
+  resources:
+  - roles
+  verbs:
+  - create
+  - delete
+  - get
+  - patch
+  - update
+- apiGroups:
   - context.kube-auth
   resources:
   - contexts
@@ -34,6 +44,32 @@ rules:
   - context.kube-auth
   resources:
   - contexts/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - context.kube-auth
+  resources:
+  - roles
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - context.kube-auth
+  resources:
+  - roles/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - context.kube-auth
+  resources:
+  - roles/status
   verbs:
   - get
   - patch
