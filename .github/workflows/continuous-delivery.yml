@@ -15,6 +15,16 @@ jobs:
       IMAGE_NAME: ${{ github.repository }}
 
     steps:
+      - name: Test
+        run: |
+          echo "Testing the code"
+          echo ${{ github.repository }}
+          echo ${{ github.actor }}
+          echo ${{ github.ref }}
+          echo ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.project }}
+          echo ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}${{ matrix.project }}
+          echo ${{ env.IMAGE_NAME }}
+          echo ${{ matrix.project }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
