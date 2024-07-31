@@ -12,19 +12,9 @@ jobs:
       packages: write
     env:
       REGISTRY: ghcr.io
-      IMAGE_NAME: ${{ github.repository }}
+      IMAGE_NAME: ${{ env.REGISTRY }}/${{ github.repository }}
 
     steps:
-      - name: Test
-        run: |
-          echo "Testing the code"
-          echo ${{ github.repository }}
-          echo ${{ github.actor }}
-          echo ${{ github.ref }}
-          echo ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.project }}
-          echo ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}${{ matrix.project }}
-          echo ${{ env.IMAGE_NAME }}
-          echo ${{ matrix.project }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -42,12 +32,12 @@ jobs:
         id: meta
         uses: docker/metadata-action@v2
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.project }}
+          images: ${{ env.IMAGE_NAME }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:
-          context: "./${{ matrix.project }}"
+          context: "."
           file: ./Dockerfile
           build-args: |
             NPM_TOKEN=${{ secrets.GITHUB_TOKEN }}
