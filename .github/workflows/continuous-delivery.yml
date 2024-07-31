@@ -12,7 +12,7 @@ jobs:
       packages: write
     env:
       REGISTRY: ghcr.io
-      IMAGE_NAME: ${{ env.REGISTRY }}/${{ github.repository }}
+      IMAGE_NAME: ${{ github.repository }}
 
     steps:
       - name: Set up QEMU
@@ -32,7 +32,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v2
         with:
-          images: ${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
