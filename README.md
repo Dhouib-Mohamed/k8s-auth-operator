@@ -1,8 +1,14 @@
 # k8s-auth-operator
-// TODO(user): Add simple overview of use/purpose
+Kubernetes auth operator is a project that aims to provide a solution to manage the authentication of the Kubernetes cluster. It is built using the Kubebuilder framework.
+
 
 ## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+As the Kubernetes cluster grows, managing the authentication of the cluster becomes a tedious task. This project aims to provide a solution to manage the authentication of the Kubernetes cluster. The operator will manage the authentication of the cluster by creating and managing the service accounts, roles, and role bindings. The operator will also provide a way to manage the authentication of the cluster using a declarative approach.<br>
+It uses a custom resource definition (CRD) to define the authentication configuration of the cluster. The operator will watch for changes to the CRD and reconcile the state of the cluster based on the configuration defined in the CRD.
+<br>The Provided CRDs are:
+- **Context:** This CRD defines the context of the authentication configuration. It groups the list of the relevant namespaces by name or by regex.
+- **Role:** This CRD defines the role of the authentication configuration. It defines the role name and the list of the resources that the role can access.
+- **User:** This CRD defines the user of the authentication configuration. It defines the username and the list of the roles that the user can access.
 
 ## Getting Started
 
@@ -16,7 +22,7 @@
 **Build and push your image to the location specified by `IMG`:**
 
 ```sh
-make docker-build docker-push IMG=<some-registry>/k8s-auth-operator:tag
+make docker-build docker-push IMG=ghcr.io/Dhouib-Mohamed/k8s-auth-operator:tag
 ```
 
 **NOTE:** This image ought to be published in the personal registry you specified.
@@ -32,7 +38,7 @@ make install
 **Deploy the Manager to the cluster with the image specified by `IMG`:**
 
 ```sh
-make deploy IMG=<some-registry>/k8s-auth-operator:tag
+make deploy IMG=ghcr.io/Dhouib-Mohamed/k8s-auth-operator:tag
 ```
 
 > **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin
@@ -73,7 +79,7 @@ Following are the steps to build the installer and distribute this project to us
 1. Build the installer for the image built and published in the registry:
 
 ```sh
-make build-installer IMG=<some-registry>/k8s-auth-operator:tag
+make build-installer IMG=ghcr.io/Dhouib-Mohamed/k8s-auth-operator:tag
 ```
 
 NOTE: The makefile target mentioned above generates an 'install.yaml'
@@ -86,11 +92,22 @@ its dependencies.
 Users can just run kubectl apply -f <URL for YAML BUNDLE> to install the project, i.e.:
 
 ```sh
-kubectl apply -f https://raw.githubusercontent.com/<org>/k8s-auth-operator/<tag or branch>/dist/install.yaml
+kubectl apply -f https://raw.githubusercontent.com/Dhouib-Mohamed/k8s-auth-operator/<tag>/dist/install.yaml
 ```
 
 ## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
+In order to contribute to this project, please follow the following steps:
+
+1. Fork the repository
+2. Create a new branch (`git checkout -b feature`)
+3. Make the appropriate changes in the files
+4. Add changes to reflect the changes made
+5. Commit your changes (`git commit -am 'Add new feature'`)
+6. Push to the branch (`git push origin feature`)
+7. Create a Pull Request
+8. Get the PR approved
+
+
 
 **NOTE:** Run `make help` for more information on all potential `make` targets
 
