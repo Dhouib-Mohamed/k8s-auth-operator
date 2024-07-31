@@ -15,6 +15,9 @@ jobs:
       IMAGE_NAME: ${{ github.repository }}
 
     steps:
+      - name: Check out the repository
+        uses: actions/checkout@v3
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -37,7 +40,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:
-          context: "./"
+          context: .
           file: ./Dockerfile
           build-args: |
             NPM_TOKEN=${{ secrets.GITHUB_TOKEN }}
