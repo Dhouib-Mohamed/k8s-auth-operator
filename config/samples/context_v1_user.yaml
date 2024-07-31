@@ -1,0 +1,10 @@
+apiVersion: context.kube-auth/v1
+kind: User
+metadata:
+  labels:
+    app.kubernetes.io/name: k8s-auth-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: user-sample
+spec:
+  roles:
+    - role-sample

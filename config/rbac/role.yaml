@@ -74,3 +74,29 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - context.kube-auth
+  resources:
+  - users
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - context.kube-auth
+  resources:
+  - users/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - context.kube-auth
+  resources:
+  - users/status
+  verbs:
+  - get
+  - patch
+  - update

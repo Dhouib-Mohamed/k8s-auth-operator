@@ -2,4 +2,5 @@
 resources:
 - context_v1_context.yaml
 - context_v1_role.yaml
+- context_v1_user.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples
