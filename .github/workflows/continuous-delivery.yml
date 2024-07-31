@@ -37,7 +37,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:
-          context: "."
+          context: "./"
           file: ./Dockerfile
           build-args: |
             NPM_TOKEN=${{ secrets.GITHUB_TOKEN }}
