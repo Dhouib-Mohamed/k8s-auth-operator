@@ -34,7 +34,9 @@ type UserSpec struct {
 type UserStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-	KubeConfig string `json:"kubeConfig"`
+	KubeConfig         string             `json:"kubeConfig"`
+	ObservedGeneration int64              `json:"observedGeneration,omitempty"`
+	Conditions         []ContextCondition `json:"conditions,omitempty"`
 }
 
 // +kubebuilder:object:root=true

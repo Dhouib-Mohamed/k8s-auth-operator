@@ -1,3 +1,19 @@
+/*
+Copyright 2024.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package controller
 
 import (
@@ -8,7 +24,10 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"kube-auth.io/internal/controller/utils"
 	"math/big"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -32,17 +51,23 @@ type UserReconciler struct {
 // +kubebuilder:rbac:groups=context.kube-auth,resources=users/finalizers,verbs=update
 
 func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.FromContext(ctx)
-
 	user := &contextv1.User{}
 	err := r.Get(ctx, req.NamespacedName, user)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			logger.Info("User resource not found. Ignoring since object must be deleted")
-			return ctrl.Result{}, nil
+			return r.UpdateStatus(ctx, nil, "", utils.BasicCondition{
+				Type:    contextv1.TypeNotReady,
+				Status:  contextv1.StatusFalse,
+				Reason:  "User not found",
+				Message: "User not found",
+			}, nil)
 		}
-		logger.Error(err, "Failed to get User")
-		return ctrl.Result{}, err
+		return r.UpdateStatus(ctx, nil, "", utils.BasicCondition{
+			Type:    contextv1.TypeNotReady,
+			Status:  contextv1.StatusFalse,
+			Reason:  "Error fetching user",
+			Message: err.Error(),
+		}, err)
 	}
 
 	var roles []*contextv1.Role
@@ -53,41 +78,54 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 			Name:      role,
 		}, fetchedRole)
 		if err != nil {
-			logger.Error(err, "Failed to get Role", "role", role)
-			return ctrl.Result{}, err
+			return r.UpdateStatus(ctx, user, "", utils.BasicCondition{
+				Type:    contextv1.TypeNotReady,
+				Status:  contextv1.StatusFalse,
+				Reason:  "Error fetching role",
+				Message: err.Error(),
+			}, err)
 		}
 		roles = append(roles, fetchedRole)
 	}
 
 	err = r.createOrUpdateClusterRoleBinding(user, roles)
 	if err != nil {
-		logger.Error(err, "Failed to create or update ClusterRoleBinding")
-		return ctrl.Result{}, err
+		return r.UpdateStatus(ctx, user, "", utils.BasicCondition{
+			Type:    contextv1.TypeNotReady,
+			Status:  contextv1.StatusFalse,
+			Reason:  "Error creating or updating cluster role binding",
+			Message: err.Error(),
+		}, err)
 	}
 
-	if user.Status.KubeConfig == "" {
+	kubeConfig := user.Status.KubeConfig
+	if kubeConfig == "" {
 		certPEM, keyPEM, err := r.createSelfSignedCert(user.Name)
 		if err != nil {
-			logger.Error(err, "Failed to create self-signed certificate")
-			return ctrl.Result{}, err
+			return r.UpdateStatus(ctx, user, "", utils.BasicCondition{
+				Type:    contextv1.TypeNotReady,
+				Status:  contextv1.StatusFalse,
+				Reason:  "Failed to create certificate",
+				Message: err.Error(),
+			}, err)
 		}
 
-		kubeConfig, err := r.createKubeConfig(user.Name, certPEM, keyPEM)
+		kubeConfig, err = r.createKubeConfig(user.Name, certPEM, keyPEM)
 		if err != nil {
-			logger.Error(err, "Failed to create kubeconfig")
-			return ctrl.Result{}, err
-		}
-
-		user.Status.KubeConfig = kubeConfig
-		err = r.Status().Update(ctx, user)
-		if err != nil {
-			logger.Error(err, "Failed to update User status")
-			return ctrl.Result{}, err
+			return r.UpdateStatus(ctx, user, "", utils.BasicCondition{
+				Type:    contextv1.TypeNotReady,
+				Status:  contextv1.StatusFalse,
+				Reason:  "Failed to create kubeconfig",
+				Message: err.Error(),
+			}, err)
 		}
 	}
-
-	logger.Info("Successfully reconciled User", "namespace", req.Namespace, "name", req.Name)
-	return ctrl.Result{}, nil
+	return r.UpdateStatus(ctx, user, kubeConfig, utils.BasicCondition{
+		Type:    contextv1.TypeReady,
+		Status:  contextv1.StatusTrue,
+		Reason:  "User synced",
+		Message: "User synced",
+	}, nil)
 }
 
 func (r *UserReconciler) createSelfSignedCert(userName string) ([]byte, []byte, error) {
@@ -190,5 +228,32 @@ func (r *UserReconciler) createOrUpdateClusterRoleBinding(user *contextv1.User, 
 func (r *UserReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&contextv1.User{}).
+		WithEventFilter(predicate.Funcs{
+			CreateFunc: func(e event.TypedCreateEvent[client.Object]) bool {
+				return e.Object.GetGeneration() == 1
+			},
+			DeleteFunc: func(e event.TypedDeleteEvent[client.Object]) bool {
+				return false
+			},
+			UpdateFunc: func(e event.UpdateEvent) bool { return e.ObjectOld.GetGeneration() != e.ObjectNew.GetGeneration() },
+			GenericFunc: func(e event.GenericEvent) bool {
+				return false
+			},
+		}).
 		Complete(r)
+}
+
+func (r *UserReconciler) UpdateStatus(ctx context.Context, user *contextv1.User, kubeConfig string, condition utils.BasicCondition, Error error) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
+	if user == nil {
+		return utils.HandleError(logger, Error, condition.Message)
+	}
+	user.Status.KubeConfig = kubeConfig
+	user.Status.ObservedGeneration = user.Status.ObservedGeneration + 1
+	user.Status.Conditions = utils.SyncConditions(user.Status.Conditions, condition)
+	err := r.Status().Update(ctx, user)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	return utils.HandleError(logger, Error, condition.Message)
 }
