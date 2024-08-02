@@ -44,43 +44,72 @@ type ContextReconciler struct {
 //+kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch
 
 func (r *ContextReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.FromContext(ctx)
-
 	// Fetch the NamespaceContext instance
 	namespaceContext := &contextv1.Context{}
 	err := r.Get(ctx, req.NamespacedName, namespaceContext)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return r.UpdateStatus(ctx, nil, nil, contextv1.TypeNotReady, contextv1.StatusFalse, "Context not found", "Context not found", nil)
+			return r.UpdateStatus(ctx, nil, nil, utils.BasicCondition{
+				Type:    contextv1.TypeNotReady,
+				Status:  contextv1.StatusFalse,
+				Reason:  "Context not found",
+				Message: "Context not found",
+			}, nil)
 		}
-		return r.UpdateStatus(ctx, nil, nil, contextv1.TypeNotReady, contextv1.StatusFalse, "Error fetching context", err.Error(), err)
+		return r.UpdateStatus(ctx, nil, nil, utils.BasicCondition{
+			Type:    contextv1.TypeNotReady,
+			Status:  contextv1.StatusFalse,
+			Reason:  "Error fetching context",
+			Message: err.Error(),
+		}, err)
 	}
 
 	// List all namespaces
 	namespaceList := &corev1.NamespaceList{}
 	err = r.List(ctx, namespaceList)
 	if err != nil {
-		return r.UpdateStatus(ctx, namespaceContext, nil, contextv1.TypeNotReady, contextv1.StatusFalse, "Error listing namespaces", err.Error(), err)
+		return r.UpdateStatus(ctx, namespaceContext, nil, utils.BasicCondition{
+			Type:    contextv1.TypeNotReady,
+			Status:  contextv1.StatusFalse,
+			Reason:  "Error listing namespaces",
+			Message: err.Error(),
+		}, err)
 	}
 
 	matchedNamespaces := []string{}
 
 	if err := utils.CheckNamespaces(namespaceList.Items, namespaceContext.Spec.Namespaces, &matchedNamespaces); err != nil {
-		//logger.Error(err, "Namespace not found")
-		return r.UpdateStatus(ctx, namespaceContext, nil, contextv1.TypeNotReady, contextv1.StatusFalse, "Namespace not found", err.Error(), err)
+		return r.UpdateStatus(ctx, namespaceContext, nil, utils.BasicCondition{
+			Type:    contextv1.TypeNotReady,
+			Status:  contextv1.StatusFalse,
+			Reason:  "Error checking namespaces",
+			Message: err.Error(),
+		}, err)
 	}
 
 	if err := utils.FindNamespaces(namespaceList.Items, namespaceContext.Spec.Find, &matchedNamespaces); err != nil {
-		logger.Error(err, "Error finding namespaces")
-		return r.UpdateStatus(ctx, namespaceContext, nil, contextv1.TypeNotReady, contextv1.StatusFalse, "Error finding namespaces", err.Error(), err)
+		return r.UpdateStatus(ctx, namespaceContext, nil, utils.BasicCondition{
+			Type:    contextv1.TypeNotReady,
+			Status:  contextv1.StatusFalse,
+			Reason:  "Error finding namespaces",
+			Message: err.Error(),
+		}, err)
 	}
 
 	if len(matchedNamespaces) == 0 {
-		logger.Info("No namespaces found")
-		return r.UpdateStatus(ctx, namespaceContext, nil, contextv1.TypeNotReady, contextv1.StatusFalse, "No namespaces found", "No namespaces found", nil)
+		return r.UpdateStatus(ctx, namespaceContext, nil, utils.BasicCondition{
+			Type:    contextv1.TypeNotReady,
+			Status:  contextv1.StatusFalse,
+			Reason:  "No namespaces found",
+			Message: "No namespaces found",
+		}, nil)
 	}
-
-	return r.UpdateStatus(ctx, namespaceContext, matchedNamespaces, contextv1.TypeReady, contextv1.StatusTrue, "Context synced", "Context synced", nil)
+	return r.UpdateStatus(ctx, namespaceContext, matchedNamespaces, utils.BasicCondition{
+		Type:    contextv1.TypeReady,
+		Status:  contextv1.StatusTrue,
+		Reason:  "Context synced",
+		Message: "Context synced",
+	}, nil)
 }
 
 func (r *ContextReconciler) SetupWithManager(mgr ctrl.Manager) error {
@@ -106,37 +135,37 @@ func (r *ContextReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *ContextReconciler) UpdateStatus(ctx context.Context, context *contextv1.Context, namespaces []string, status_type contextv1.TypeEnum, status contextv1.StatusEnum, reason string, message string, Error error) (ctrl.Result, error) {
+func (r *ContextReconciler) UpdateStatus(ctx context.Context, context *contextv1.Context, namespaces []string, condition utils.BasicCondition, Error error) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 	if context == nil {
 		if Error != nil {
-			logger.Error(Error, message)
+			logger.Error(Error, condition.Message)
 			return ctrl.Result{Requeue: false}, nil
 		}
 		return ctrl.Result{}, nil
 	}
 	context.Status.ObservedGeneration = context.Status.ObservedGeneration + 1
 	logger.Info("Updating context status", "namespaces", namespaces, "syncedNamespaces", context.Status.SyncedNamespaces, "result", utils.NamespacesEqual(namespaces, context.Status.SyncedNamespaces))
-	if context.Status.Conditions != nil && utils.NamespacesEqual(namespaces, context.Status.SyncedNamespaces) {
+	if context.Status.Conditions != nil && utils.NamespacesEqual(namespaces, context.Status.SyncedNamespaces) && utils.CompareConditions(condition, context.Status.Conditions[0]) {
 		logger.Info("Context already synced")
 		context.Status.Conditions[0].LastUpdateTime = metav1.Now()
 	} else {
 		if context.Status.Conditions == nil {
 			context.Status.Conditions = []contextv1.ContextCondition{}
 		}
-		if status == contextv1.StatusFalse {
+		if condition.Status == contextv1.StatusFalse {
 			context.Status.SyncedNamespaces = []string{}
 		} else {
 			context.Status.SyncedNamespaces = namespaces
 		}
 		context.Status.Conditions = slices.Insert(context.Status.Conditions, 0,
 			contextv1.ContextCondition{
-				Type:               status_type,
-				Status:             status,
 				LastTransitionTime: metav1.Now(),
 				LastUpdateTime:     metav1.Now(),
-				Reason:             reason,
-				Message:            message,
+				Type:               condition.Type,
+				Status:             condition.Status,
+				Reason:             condition.Reason,
+				Message:            condition.Message,
 			})
 	}
 	logger.Info("Updating context status", "context", context)
@@ -145,7 +174,7 @@ func (r *ContextReconciler) UpdateStatus(ctx context.Context, context *contextv1
 		return ctrl.Result{}, err
 	}
 	if Error != nil {
-		logger.Error(Error, message)
+		logger.Error(Error, condition.Message)
 		return ctrl.Result{}, nil
 	}
 	return ctrl.Result{}, nil
