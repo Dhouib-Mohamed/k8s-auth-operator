@@ -20,7 +20,6 @@ import (
 	"context"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	contextv1 "kube-auth.io/api/v1"
 	"kube-auth.io/internal/controller/utils"
@@ -29,7 +28,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"slices"
 )
 
 // ContextReconciler reconciles a Context object
@@ -138,44 +136,14 @@ func (r *ContextReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *ContextReconciler) UpdateStatus(ctx context.Context, context *contextv1.Context, namespaces []string, condition utils.BasicCondition, Error error) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 	if context == nil {
-		if Error != nil {
-			logger.Error(Error, condition.Message)
-			return ctrl.Result{Requeue: false}, nil
-		}
-		return ctrl.Result{}, nil
+		return utils.HandleError(logger, Error, condition.Message)
 	}
+	context.Status.SyncedNamespaces = namespaces
 	context.Status.ObservedGeneration = context.Status.ObservedGeneration + 1
-	logger.Info("Updating context status", "namespaces", namespaces, "syncedNamespaces", context.Status.SyncedNamespaces, "result", utils.NamespacesEqual(namespaces, context.Status.SyncedNamespaces))
-	if context.Status.Conditions != nil && utils.NamespacesEqual(namespaces, context.Status.SyncedNamespaces) && utils.CompareConditions(condition, context.Status.Conditions[0]) {
-		logger.Info("Context already synced")
-		context.Status.Conditions[0].LastUpdateTime = metav1.Now()
-	} else {
-		if context.Status.Conditions == nil {
-			context.Status.Conditions = []contextv1.ContextCondition{}
-		}
-		if condition.Status == contextv1.StatusFalse {
-			context.Status.SyncedNamespaces = []string{}
-		} else {
-			context.Status.SyncedNamespaces = namespaces
-		}
-		context.Status.Conditions = slices.Insert(context.Status.Conditions, 0,
-			contextv1.ContextCondition{
-				LastTransitionTime: metav1.Now(),
-				LastUpdateTime:     metav1.Now(),
-				Type:               condition.Type,
-				Status:             condition.Status,
-				Reason:             condition.Reason,
-				Message:            condition.Message,
-			})
-	}
-	logger.Info("Updating context status", "context", context)
+	context.Status.Conditions = utils.SyncConditions(context.Status.Conditions, condition)
 	err := r.Status().Update(ctx, context)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	if Error != nil {
-		logger.Error(Error, condition.Message)
-		return ctrl.Result{}, nil
-	}
-	return ctrl.Result{}, nil
+	return utils.HandleError(logger, Error, condition.Message)
 }

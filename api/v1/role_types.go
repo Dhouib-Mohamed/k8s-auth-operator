@@ -53,8 +53,10 @@ type RoleSpec struct {
 
 // RoleStatus defines the observed state of Role
 type RoleStatus struct {
-	Role        string `json:"role"`
-	RoleBinding string `json:"roleBinding"`
+	Role               string             `json:"role"`
+	RoleBinding        string             `json:"roleBinding"`
+	ObservedGeneration int64              `json:"observedGeneration,omitempty"`
+	Conditions         []ContextCondition `json:"conditions,omitempty"`
 }
 
 // +kubebuilder:object:root=true

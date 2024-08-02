@@ -1,3 +1,19 @@
+/*
+Copyright 2024.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package controller
 
 import (
@@ -12,7 +28,6 @@ import (
 	"math/big"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"slices"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -83,24 +98,27 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		}, err)
 	}
 
-	certPEM, keyPEM, err := r.createSelfSignedCert(user.Name)
-	if err != nil {
-		return r.UpdateStatus(ctx, user, "", utils.BasicCondition{
-			Type:    contextv1.TypeNotReady,
-			Status:  contextv1.StatusFalse,
-			Reason:  "Failed to create certificate",
-			Message: err.Error(),
-		}, err)
-	}
+	kubeConfig := user.Status.KubeConfig
+	if kubeConfig == "" {
+		certPEM, keyPEM, err := r.createSelfSignedCert(user.Name)
+		if err != nil {
+			return r.UpdateStatus(ctx, user, "", utils.BasicCondition{
+				Type:    contextv1.TypeNotReady,
+				Status:  contextv1.StatusFalse,
+				Reason:  "Failed to create certificate",
+				Message: err.Error(),
+			}, err)
+		}
 
-	kubeConfig, err := r.createKubeConfig(user.Name, certPEM, keyPEM)
-	if err != nil {
-		return r.UpdateStatus(ctx, user, "", utils.BasicCondition{
-			Type:    contextv1.TypeNotReady,
-			Status:  contextv1.StatusFalse,
-			Reason:  "Failed to create kubeconfig",
-			Message: err.Error(),
-		}, err)
+		kubeConfig, err = r.createKubeConfig(user.Name, certPEM, keyPEM)
+		if err != nil {
+			return r.UpdateStatus(ctx, user, "", utils.BasicCondition{
+				Type:    contextv1.TypeNotReady,
+				Status:  contextv1.StatusFalse,
+				Reason:  "Failed to create kubeconfig",
+				Message: err.Error(),
+			}, err)
+		}
 	}
 	return r.UpdateStatus(ctx, user, kubeConfig, utils.BasicCondition{
 		Type:    contextv1.TypeReady,
@@ -228,45 +246,14 @@ func (r *UserReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *UserReconciler) UpdateStatus(ctx context.Context, user *contextv1.User, kubeConfig string, condition utils.BasicCondition, Error error) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 	if user == nil {
-		if Error != nil {
-			logger.Error(Error, condition.Message)
-			return ctrl.Result{Requeue: false}, nil
-		}
-		return ctrl.Result{}, nil
+		return utils.HandleError(logger, Error, condition.Message)
 	}
+	user.Status.KubeConfig = kubeConfig
 	user.Status.ObservedGeneration = user.Status.ObservedGeneration + 1
-	if user.Status.Conditions != nil && utils.CompareConditions(condition, user.Status.Conditions[0]) {
-		logger.Info("user already synced")
-		user.Status.Conditions[0].LastUpdateTime = metav1.Now()
-	} else {
-		if user.Status.Conditions == nil {
-			user.Status.Conditions = []contextv1.ContextCondition{}
-		}
-		if user.Status.KubeConfig == "" {
-			user.Status.KubeConfig = kubeConfig
-		}
-		if condition.Status == contextv1.StatusFalse {
-			user.Status.KubeConfig = ""
-		}
-
-		user.Status.Conditions = slices.Insert(user.Status.Conditions, 0,
-			contextv1.ContextCondition{
-				LastTransitionTime: metav1.Now(),
-				LastUpdateTime:     metav1.Now(),
-				Type:               condition.Type,
-				Status:             condition.Status,
-				Reason:             condition.Reason,
-				Message:            condition.Message,
-			})
-	}
-	logger.Info("Updating user status", "user", user)
+	user.Status.Conditions = utils.SyncConditions(user.Status.Conditions, condition)
 	err := r.Status().Update(ctx, user)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	if Error != nil {
-		logger.Error(Error, condition.Message)
-		return ctrl.Result{}, nil
-	}
-	return ctrl.Result{}, nil
+	return utils.HandleError(logger, Error, condition.Message)
 }
