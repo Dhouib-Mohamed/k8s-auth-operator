@@ -1,4 +1,4 @@
-package controller
+package utils
 
 import (
 	errorsHandler "errors"
@@ -6,7 +6,7 @@ import (
 	"regexp"
 )
 
-func checkNamespaces(AllNamespaces []corev1.Namespace, namespaceList []string, matchedNamespaces *[]string) error {
+func CheckNamespaces(AllNamespaces []corev1.Namespace, namespaceList []string, matchedNamespaces *[]string) error {
 	for _, ns := range namespaceList {
 		found := false
 		for _, allNs := range AllNamespaces {
@@ -23,7 +23,7 @@ func checkNamespaces(AllNamespaces []corev1.Namespace, namespaceList []string, m
 	return nil
 }
 
-func findNamespaces(allNamespaces []corev1.Namespace, namespaceFind []string, matchedNamespaces *[]string) error {
+func FindNamespaces(allNamespaces []corev1.Namespace, namespaceFind []string, matchedNamespaces *[]string) error {
 	for _, find := range namespaceFind {
 		regex, err := regexp.Compile(find)
 		if err != nil {
@@ -45,4 +45,26 @@ func appendNamespace(matchedNamespaces *[]string, namespace string) {
 		}
 	}
 	*matchedNamespaces = append(*matchedNamespaces, namespace)
+}
+
+func NamespacesEqual(a, b []string) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	for _, ns := range a {
+		found := false
+		for _, ns2 := range b {
+			if ns == ns2 {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }

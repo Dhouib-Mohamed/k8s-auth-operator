@@ -38,7 +38,9 @@ type ContextStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 	// SyncedNamespaces is the list of namespaces that match the context
-	SyncedNamespaces []string `json:"syncedNamespaces,omitempty"`
+	SyncedNamespaces   []string           `json:"syncedNamespaces,omitempty"`
+	ObservedGeneration int64              `json:"observedGeneration,omitempty"`
+	Conditions         []ContextCondition `json:"conditions,omitempty"`
 }
 
 // +kubebuilder:object:root=true
