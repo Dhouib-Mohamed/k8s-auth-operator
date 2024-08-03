@@ -21,8 +21,8 @@ func compareConditions(newCondition BasicCondition, oldCondition v1.ContextCondi
 }
 
 func incrementConditions(conditions []v1.ContextCondition, newCondition BasicCondition) []v1.ContextCondition {
-	var newConditions []v1.ContextCondition
-	if conditions == nil {
+	newConditions := conditions
+	if newConditions == nil {
 		newConditions = []contextv1.ContextCondition{}
 	}
 
@@ -47,11 +47,11 @@ func HandleError(logger logr.Logger, err error, message string) (ctrl.Result, er
 }
 
 func SyncConditions(conditions []v1.ContextCondition, newCondition BasicCondition) []v1.ContextCondition {
-	var newConditions []v1.ContextCondition
-	if conditions != nil && compareConditions(newCondition, conditions[0]) {
+	newConditions := conditions
+	if newConditions != nil && compareConditions(newCondition, newConditions[0]) {
 		newConditions[0].LastUpdateTime = metav1.Now()
 	} else {
-		newConditions = incrementConditions(conditions, newCondition)
+		newConditions = incrementConditions(newConditions, newCondition)
 	}
 
 	return newConditions
