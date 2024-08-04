@@ -12,7 +12,7 @@ func CheckNamespaces(AllNamespaces []corev1.Namespace, namespaceList []string, m
 		for _, allNs := range AllNamespaces {
 			if ns == allNs.Name {
 				found = true
-				appendNamespace(matchedNamespaces, ns)
+				AppendNamespace(matchedNamespaces, ns)
 				break
 			}
 		}
@@ -31,14 +31,14 @@ func FindNamespaces(allNamespaces []corev1.Namespace, namespaceFind []string, ma
 		}
 		for _, ns := range allNamespaces {
 			if regex.MatchString(ns.Name) {
-				appendNamespace(matchedNamespaces, ns.Name)
+				AppendNamespace(matchedNamespaces, ns.Name)
 			}
 		}
 	}
 	return nil
 }
 
-func appendNamespace(matchedNamespaces *[]string, namespace string) {
+func AppendNamespace(matchedNamespaces *[]string, namespace string) {
 	for _, ns := range *matchedNamespaces {
 		if ns == namespace {
 			return

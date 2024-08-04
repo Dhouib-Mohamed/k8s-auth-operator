@@ -10,13 +10,14 @@ spec:
     create: true
     delete: false
   clusterRole:
-    -  namespaces: ["default"]
+    -  namespaces:
+        - "default"
        verbs: ["get", "list"]
-       contexts: []
-       exclude:
-          resources: []
-          instances: []
-       include:
-         resources: ["pods", "namespaces"]
-         instances: []
+       contexts:
+          - "context-sample"
+       resources: ["pods", "secrets"]
+       instances:
+         - kind: "pod"
+           name:
+             - "pod-sample"
 
