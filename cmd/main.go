@@ -19,6 +19,9 @@ package main
 import (
 	"crypto/tls"
 	"flag"
+	"kube-auth.io/internal/controller/context"
+	"kube-auth.io/internal/controller/role"
+	"kube-auth.io/internal/controller/user"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -36,7 +39,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	contextv1 "kube-auth.io/api/v1"
-	"kube-auth.io/internal/controller"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -139,21 +141,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controller.ContextReconciler{
+	if err = (&context.ContextReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Context")
 		os.Exit(1)
 	}
-	if err = (&controller.RoleReconciler{
+	if err = (&role.RoleReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Role")
 		os.Exit(1)
 	}
-	if err = (&controller.UserReconciler{
+	if err = (&user.UserReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {

@@ -14,24 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package user
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/pem"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"kube-auth.io/internal/controller/utils"
-	"math/big"
-	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"time"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"kube-auth.io/internal/controller/utils"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -154,156 +143,10 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	}, nil)
 }
 
-func (r *UserReconciler) createSelfSignedCert(userName string) ([]byte, []byte, error) {
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	template := x509.Certificate{
-		SerialNumber: big.NewInt(time.Now().UnixNano()),
-		Subject: pkix.Name{
-			CommonName: userName,
-		},
-		NotBefore: time.Now(),
-		NotAfter:  time.Now().Add(365 * 24 * time.Hour),
-		KeyUsage:  x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		ExtKeyUsage: []x509.ExtKeyUsage{
-			x509.ExtKeyUsageClientAuth,
-		},
-	}
-
-	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
-	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(privateKey)})
-
-	return certPEM, keyPEM, nil
-}
-
-func (r *UserReconciler) createKubeConfig(userName string, certPEM []byte, keyPEM []byte) (string, error) {
-	kubeConfig := `apiVersion: v1
-clusters:
-- cluster:
-    certificate-authority-data: <CA_CERT>
-    server: <API_SERVER>
-  name: kubernetes
-contexts:
-- context:
-    cluster: kubernetes
-    user: ` + userName + `
-  name: ` + userName + `@kubernetes
-current-context: ` + userName + `@kubernetes
-kind: Config
-preferences: {}
-users:
-- name: ` + userName + `
-  user:
-    client-certificate-data: ` + string(certPEM) + `
-    client-key-data: ` + string(keyPEM)
-
-	return kubeConfig, nil
-}
-
-func (r *UserReconciler) linkUserToRoleBinding(roleName string, namespace string, subject rbacv1.Subject) error {
-	var roleBinding client.Object
-	roleBindingName := roleName + "-binding"
-	var err error
-	if namespace == "" {
-		roleBinding = &rbacv1.ClusterRoleBinding{}
-		err = r.Get(context.TODO(), client.ObjectKey{
-			Name: roleBindingName,
-		}, roleBinding)
-	} else {
-		roleBinding = &rbacv1.RoleBinding{}
-		err = r.Get(context.TODO(), client.ObjectKey{
-			Namespace: namespace,
-			Name:      roleBindingName,
-		}, roleBinding)
-	}
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			if namespace == "" {
-				roleBinding = &rbacv1.ClusterRoleBinding{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: roleBindingName,
-					},
-					Subjects: []rbacv1.Subject{subject},
-					RoleRef: rbacv1.RoleRef{
-						Kind:     "ClusterRole",
-						Name:     roleName,
-						APIGroup: "rbac.authorization.k8s.io",
-					},
-				}
-			} else {
-				roleBinding = &rbacv1.RoleBinding{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: namespace,
-						Name:      roleBindingName,
-					},
-					Subjects: []rbacv1.Subject{subject},
-					RoleRef: rbacv1.RoleRef{
-						Kind:     "Role",
-						Name:     roleName,
-						APIGroup: "rbac.authorization.k8s.io",
-					},
-				}
-			}
-			err := r.Create(context.TODO(), roleBinding)
-			if err != nil {
-				return err
-			}
-			return nil
-		}
-		return err
-	}
-	if namespace == "" {
-		roleBinding = &rbacv1.ClusterRoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: roleBindingName,
-			},
-			Subjects: append(roleBinding.(*rbacv1.ClusterRoleBinding).Subjects, subject),
-			RoleRef: rbacv1.RoleRef{
-				Kind:     "ClusterRole",
-				Name:     roleName,
-				APIGroup: "rbac.authorization.k8s.io",
-			},
-		}
-	} else {
-		roleBinding = &rbacv1.RoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: namespace,
-				Name:      roleBindingName,
-			},
-			Subjects: append(roleBinding.(*rbacv1.RoleBinding).Subjects, subject),
-			RoleRef: rbacv1.RoleRef{
-				Kind:     "Role",
-				Name:     roleName,
-				APIGroup: "rbac.authorization.k8s.io",
-			},
-		}
-	}
-	return r.Update(context.TODO(), roleBinding)
-}
-
 func (r *UserReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&contextv1.User{}).
-		WithEventFilter(predicate.Funcs{
-			CreateFunc: func(e event.TypedCreateEvent[client.Object]) bool {
-				return e.Object.GetGeneration() == 1
-			},
-			DeleteFunc: func(e event.TypedDeleteEvent[client.Object]) bool {
-				return false
-			},
-			UpdateFunc: func(e event.UpdateEvent) bool { return e.ObjectOld.GetGeneration() != e.ObjectNew.GetGeneration() },
-			GenericFunc: func(e event.GenericEvent) bool {
-				return false
-			},
-		}).
+		WithEventFilter(utils.FilterFuncs()).
 		Complete(r)
 }
 

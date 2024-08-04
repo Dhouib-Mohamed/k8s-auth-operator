@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package context
 
 import (
 	"context"
@@ -25,9 +25,7 @@ import (
 	"kube-auth.io/internal/controller/utils"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 // ContextReconciler reconciles a Context object
@@ -74,7 +72,7 @@ func (r *ContextReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}, err)
 	}
 
-	matchedNamespaces := []string{}
+	var matchedNamespaces []string
 
 	if err := utils.CheckNamespaces(namespaceList.Items, namespaceContext.Spec.Namespaces, &matchedNamespaces); err != nil {
 		return r.UpdateStatus(ctx, namespaceContext, nil, utils.BasicCondition{
@@ -115,20 +113,7 @@ func (r *ContextReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// Watch for changes on namespaces creation or deletion
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&contextv1.Context{}).
-		WithEventFilter(predicate.Funcs{
-			CreateFunc: func(e event.TypedCreateEvent[client.Object]) bool {
-				return e.Object.GetGeneration() == 1
-			},
-			DeleteFunc: func(e event.TypedDeleteEvent[client.Object]) bool {
-				return false
-			},
-			UpdateFunc: func(e event.UpdateEvent) bool {
-				return e.ObjectOld.GetGeneration() != e.ObjectNew.GetGeneration()
-			},
-			GenericFunc: func(e event.GenericEvent) bool {
-				return false
-			},
-		}).
+		WithEventFilter(utils.FilterFuncs()).
 		//Watches(&source.Kind{Type: &corev1.Namespace{}}, &handler.EnqueueRequestForObject{}).
 		Complete(r)
 }
