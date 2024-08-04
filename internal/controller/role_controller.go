@@ -51,14 +51,14 @@ func (r *RoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	err := r.Get(ctx, req.NamespacedName, CRDRole)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return r.UpdateStatus(ctx, CRDRole, "", "", utils.BasicCondition{
+			return r.UpdateStatus(ctx, CRDRole, nil, utils.BasicCondition{
 				Type:    contextv1.TypeNotReady,
 				Status:  contextv1.StatusFalse,
 				Reason:  "Role not found",
 				Message: "Role not found",
 			}, nil)
 		}
-		return r.UpdateStatus(ctx, CRDRole, "", "", utils.BasicCondition{
+		return r.UpdateStatus(ctx, CRDRole, nil, utils.BasicCondition{
 			Type:    contextv1.TypeNotReady,
 			Status:  contextv1.StatusFalse,
 			Reason:  "Error fetching role",
@@ -66,132 +66,182 @@ func (r *RoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		}, err)
 	}
 
-	// Create a Role if not existent
-	role := &rbacv1.ClusterRole{}
-	newRole := r.createK8sRole(CRDRole)
-	err = nil
-	if CRDRole.Status.Role == "" {
-		err = r.Create(ctx, newRole)
-		if err != nil {
-			return r.UpdateStatus(ctx, CRDRole, "", "", utils.BasicCondition{
-				Type:    contextv1.TypeNotReady,
-				Status:  contextv1.StatusFalse,
-				Reason:  "Error creating role",
-				Message: err.Error(),
-			}, err)
-		}
-	} else {
-		err = r.Get(ctx, types.NamespacedName{Name: CRDRole.Status.Role, Namespace: CRDRole.Namespace}, role)
-		if err != nil {
-			return r.UpdateStatus(ctx, CRDRole, "", "", utils.BasicCondition{
-				Type:    contextv1.TypeNotReady,
-				Status:  contextv1.StatusFalse,
-				Reason:  "Error fetching role",
-				Message: err.Error(),
-			}, err)
-		}
-		err = r.Update(ctx, newRole)
-		if err != nil {
-			return r.UpdateStatus(ctx, CRDRole, "", "", utils.BasicCondition{
-				Type:    contextv1.TypeNotReady,
-				Status:  contextv1.StatusFalse,
-				Reason:  "Error updating role",
-				Message: err.Error(),
-			}, err)
-		}
+	err = r.createNamespacesRole(CRDRole.Name, CRDRole.Spec.NamespaceRole)
+	if err != nil {
+		return r.UpdateStatus(ctx, CRDRole, nil, utils.BasicCondition{
+			Type:    contextv1.TypeNotReady,
+			Status:  contextv1.StatusFalse,
+			Reason:  "Error creating namespace role",
+			Message: err.Error(),
+		}, err)
 	}
 
-	return r.UpdateStatus(ctx, CRDRole, newRole.Name, "", utils.BasicCondition{
+	handledNamespaces, err := r.extractHandledNamespaces(ctx, CRDRole.Spec.ClusterRole, req.NamespacedName.Namespace)
+	if err != nil {
+		return r.UpdateStatus(ctx, CRDRole, nil, utils.BasicCondition{
+			Type:    contextv1.TypeNotReady,
+			Status:  contextv1.StatusFalse,
+			Reason:  "Error extracting handled namespaces",
+			Message: err.Error(),
+		}, err)
+	}
+	for _, existentNs := range CRDRole.Status.HandledNamespaces {
+		found := false
+		for _, handledNs := range handledNamespaces {
+			if existentNs.Namespace == handledNs.Namespace {
+				found = true
+				err = r.createOrUpdateRole(CRDRole.Name+"-"+handledNs.Namespace, handledNs.Namespace, handledNs.Roles)
+				if err != nil {
+					return r.UpdateStatus(ctx, CRDRole, nil, utils.BasicCondition{
+						Type:    contextv1.TypeNotReady,
+						Status:  contextv1.StatusFalse,
+						Reason:  "Error creating role",
+						Message: err.Error(),
+					}, err)
+				}
+				break
+			}
+		}
+		if !found {
+			err = r.Delete(ctx, &rbacv1.Role{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      CRDRole.Name + "-" + existentNs.Namespace,
+					Namespace: existentNs.Namespace,
+				},
+			})
+			if err != nil {
+				return r.UpdateStatus(ctx, CRDRole, nil, utils.BasicCondition{
+					Type:    contextv1.TypeNotReady,
+					Status:  contextv1.StatusFalse,
+					Reason:  "Error deleting role",
+					Message: err.Error(),
+				}, err)
+			}
+		}
+	}
+	return r.UpdateStatus(ctx, CRDRole, handledNamespaces, utils.BasicCondition{
 		Type:    contextv1.TypeReady,
 		Status:  contextv1.StatusTrue,
-		Reason:  "Role created",
-		Message: "Role created",
+		Reason:  "Role reconciled",
+		Message: "Role reconciled",
 	}, nil)
-
-	//
-	//// Create a Role Binding if not existent
-	//roleBinding := &rbacv1.ClusterRoleBinding{}
-	//err = r.Get(ctx, types.NamespacedName{Name: CRDRole.Name, Namespace: CRDRole.Namespace}, roleBinding)
-	//if err != nil && errors.IsNotFound(err) {
-	//	// Define a new role binding
-	//	newRoleBinding := r.createK8sRoleBinding(CRDRole)
-	//	logger.Info("Creating a new RoleBinding", "RoleBinding.Namespace", newRoleBinding.Namespace, "RoleBinding.Name", newRoleBinding.Name)
-	//	err = r.Create(ctx, newRoleBinding)
-	//	if err != nil {
-	//		return ctrl.Result{}, err
-	//	}
-	//	// RoleBinding created successfully - return and requeue
-	//	CRDRole.Status.RoleBinding = newRoleBinding.Name
-	//} else if err != nil {
-	//	return ctrl.Result{}, err
-	//}
-	//
-	//return ctrl.Result{}, nil
 }
 
-func (r RoleReconciler) createK8sRole(k *contextv1.Role) *rbacv1.ClusterRole {
-	var k8sRules []rbacv1.PolicyRule
-	// Create a namespace Rule
-	{
-		rule := rbacv1.PolicyRule{
-			Verbs:     []string{"get", "list", "watch"},
-			APIGroups: []string{""},
-			Resources: []string{"namespaces"},
-		}
-		if k.Spec.NamespaceRole.Create == nil || *k.Spec.NamespaceRole.Create {
-			rule.Verbs = append(rule.Verbs, "create")
-		}
-		if k.Spec.NamespaceRole.Delete == nil || *k.Spec.NamespaceRole.Delete {
-			rule.Verbs = append(rule.Verbs, "delete")
-		}
-		k8sRules = append(k8sRules, rule)
-	}
-	// Create a rule for each cluster role
-	{
-		for _, clusterRole := range k.Spec.ClusterRole {
-			rule := rbacv1.PolicyRule{
-				Verbs:     clusterRole.Verbs,
-				APIGroups: []string{""},
-				Resources: clusterRole.Include.Resources,
+func (r *RoleReconciler) extractHandledNamespaces(ctx context.Context, roles []contextv1.ClusterRole, namespace string) ([]contextv1.HandledNamespace, error) {
+	logger := log.FromContext(ctx)
+	var handledNamespaces []contextv1.HandledNamespace
+	for _, role := range roles {
+		namespaces := []string{}
+		for _, contextName := range role.Contexts {
+			context := &contextv1.Context{}
+			err := r.Get(ctx, types.NamespacedName{Name: contextName, Namespace: namespace}, context)
+			if err != nil {
+				return nil, err
 			}
-			k8sRules = append(k8sRules, rule)
+			for _, ns := range context.Status.SyncedNamespaces {
+				utils.AppendNamespace(&namespaces, ns)
+			}
+		}
+		for _, ns := range role.Namespaces {
+			utils.AppendNamespace(&namespaces, ns)
+		}
+		policies := []rbacv1.PolicyRule{}
+		if role.Resources != nil && len(role.Resources) > 0 {
+			policies = append(policies, rbacv1.PolicyRule{
+				Verbs:     role.Verbs,
+				APIGroups: []string{"*"},
+				Resources: role.Resources,
+			})
+		}
+		if role.Instances != nil {
+			for _, instance := range role.Instances {
+				policies = append(policies, rbacv1.PolicyRule{
+					Verbs:         role.Verbs,
+					APIGroups:     []string{"*"},
+					Resources:     []string{instance.Kind},
+					ResourceNames: instance.Name,
+				})
+			}
+		}
+
+		if len(policies) == 0 {
+			logger.Info("No policies found for role", "role", role)
+			continue
+		}
+		for _, ns := range namespaces {
+
+			found := false
+			for _, handledNamespace := range handledNamespaces {
+				if handledNamespace.Namespace == ns {
+					handledNamespace.Roles = append(handledNamespace.Roles, policies...)
+					found = true
+					break
+				}
+			}
+			if !found {
+				handledNamespaces = append(handledNamespaces, contextv1.HandledNamespace{
+					Namespace: ns,
+					Roles:     policies,
+				})
+			}
 		}
 	}
-	var role *rbacv1.ClusterRole
-	role = &rbacv1.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      k.Name + "-role",
-			Namespace: k.Namespace,
-		},
-		Rules: k8sRules,
-	}
-	if k.Status.Role != "" {
-		role.Name = k.Status.Role
-	}
-
-	err := ctrl.SetControllerReference(k, role, r.Scheme)
-	if err != nil {
-		return nil
-	}
-	return role
+	return handledNamespaces, nil
 }
 
-//func (r *RoleReconciler) createK8sRoleBinding(k *contextv1.Role) *rbacv1.ClusterRoleBinding {
-//	roleBinding := &rbacv1.ClusterRoleBinding{
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name:      k.Name,
-//			Namespace: k.Namespace,
-//		},
-//		Subjects: k.Spec.Subjects,
-//		RoleRef: rbacv1.RoleRef{
-//			Kind: "Role",
-//			Name: k.Name,
-//		},
-//	}
-//	ctrl.SetControllerReference(k, roleBinding, r.Scheme)
-//	return roleBinding
-//
-//}
+func (r *RoleReconciler) createNamespacesRole(name string, nsRole contextv1.NamespaceRole) error {
+	rule := rbacv1.PolicyRule{
+		Verbs:     []string{"get", "list", "watch"},
+		APIGroups: []string{""},
+		Resources: []string{"namespaces"},
+	}
+	if nsRole.Create == nil && nsRole.Delete == nil {
+		rule.Verbs = append(rule.Verbs, "create", "delete")
+	}
+	if *nsRole.Create {
+		rule.Verbs = append(rule.Verbs, "create")
+	}
+	if *nsRole.Delete {
+		rule.Verbs = append(rule.Verbs, "delete")
+	}
+	return r.createOrUpdateRole(name+"namespace-role", "", []rbacv1.PolicyRule{rule})
+}
+
+func (r *RoleReconciler) createOrUpdateRole(roleName string, namespace string, rules []rbacv1.PolicyRule) error {
+	var role client.Object
+	if namespace == "" {
+		role = &rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: roleName,
+			},
+			Rules: rules,
+		}
+	} else {
+		role = &rbacv1.Role{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      roleName,
+				Namespace: namespace,
+			},
+			Rules: rules,
+		}
+	}
+	log.Log.Info("Creating role", "role", role)
+	err := r.Create(context.Background(), role)
+	if err != nil {
+		if errors.IsAlreadyExists(err) {
+			log.Log.Info("Updating role", "role", role)
+			err = r.Update(context.Background(), role)
+			if err != nil {
+				return err
+			}
+		} else {
+			log.Log.Error(err, "Error creating role", "role", role)
+			return err
+		}
+	}
+	log.Log.Info("Role created", "role", role)
+	return nil
+}
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *RoleReconciler) SetupWithManager(mgr ctrl.Manager) error {
@@ -214,13 +264,12 @@ func (r *RoleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *RoleReconciler) UpdateStatus(ctx context.Context, role *contextv1.Role, roleName string, roleBindingName string, condition utils.BasicCondition, Error error) (ctrl.Result, error) {
+func (r *RoleReconciler) UpdateStatus(ctx context.Context, role *contextv1.Role, handledNamespaces []contextv1.HandledNamespace, condition utils.BasicCondition, Error error) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 	if role == nil {
 		return utils.HandleError(logger, Error, condition.Message)
 	}
-	role.Status.Role = roleName
-	role.Status.RoleBinding = roleBindingName
+	role.Status.HandledNamespaces = handledNamespaces
 	role.Status.ObservedGeneration = role.Status.ObservedGeneration + 1
 	role.Status.Conditions = utils.SyncConditions(role.Status.Conditions, condition)
 	err := r.Status().Update(ctx, role)

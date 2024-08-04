@@ -17,19 +17,15 @@ limitations under the License.
 package v1
 
 import (
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-type ResourceInstance struct {
-	Kind string `json:"kind"`
-	Name string `json:"name"`
-}
-
-type ResourceGroup struct {
-	Resources []string           `json:"resources"`
-	Instances []ResourceInstance `json:"instances"`
+type ResourceInstances struct {
+	Kind string   `json:"kind"`
+	Name []string `json:"name"`
 }
 
 type NamespaceRole struct {
@@ -38,11 +34,11 @@ type NamespaceRole struct {
 }
 
 type ClusterRole struct {
-	Contexts   []string      `json:"contexts"`
-	Namespaces []string      `json:"namespaces"`
-	Include    ResourceGroup `json:"include"`
-	Exclude    ResourceGroup `json:"exclude"`
-	Verbs      []string      `json:"verbs"`
+	Contexts   []string            `json:"contexts"`
+	Namespaces []string            `json:"namespaces"`
+	Resources  []string            `json:"resources"`
+	Instances  []ResourceInstances `json:"instances"`
+	Verbs      []string            `json:"verbs"`
 }
 
 // RoleSpec defines the desired state of Role
@@ -51,10 +47,14 @@ type RoleSpec struct {
 	ClusterRole   []ClusterRole `json:"clusterRole"`
 }
 
+type HandledNamespace struct {
+	Namespace string              `json:"namespace"`
+	Roles     []rbacv1.PolicyRule `json:"roles"`
+}
+
 // RoleStatus defines the observed state of Role
 type RoleStatus struct {
-	Role               string             `json:"role"`
-	RoleBinding        string             `json:"roleBinding"`
+	HandledNamespaces  []HandledNamespace `json:"handledNamespaces,omitempty"`
 	ObservedGeneration int64              `json:"observedGeneration,omitempty"`
 	Conditions         []ContextCondition `json:"conditions,omitempty"`
 }

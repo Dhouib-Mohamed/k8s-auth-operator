@@ -46,57 +46,28 @@ spec:
                       items:
                         type: string
                       type: array
-                    exclude:
-                      properties:
-                        instances:
-                          items:
-                            description: |-
-                              EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-                              NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-                            properties:
-                              kind:
-                                type: string
-                              name:
-                                type: string
-                            required:
-                            - kind
-                            - name
-                            type: object
-                          type: array
-                        resources:
-                          items:
+                    instances:
+                      items:
+                        description: |-
+                          EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
+                          NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+                        properties:
+                          kind:
                             type: string
-                          type: array
-                      required:
-                      - instances
-                      - resources
-                      type: object
-                    include:
-                      properties:
-                        instances:
-                          items:
-                            description: |-
-                              EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-                              NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-                            properties:
-                              kind:
-                                type: string
-                              name:
-                                type: string
-                            required:
-                            - kind
-                            - name
-                            type: object
-                          type: array
-                        resources:
-                          items:
-                            type: string
-                          type: array
-                      required:
-                      - instances
-                      - resources
-                      type: object
+                          name:
+                            items:
+                              type: string
+                            type: array
+                        required:
+                        - kind
+                        - name
+                        type: object
+                      type: array
                     namespaces:
+                      items:
+                        type: string
+                      type: array
+                    resources:
                       items:
                         type: string
                       type: array
@@ -106,9 +77,9 @@ spec:
                       type: array
                   required:
                   - contexts
-                  - exclude
-                  - include
+                  - instances
                   - namespaces
+                  - resources
                   - verbs
                   type: object
                 type: array
@@ -148,16 +119,69 @@ spec:
                       type: string
                   type: object
                 type: array
+              handledNamespaces:
+                items:
+                  properties:
+                    namespace:
+                      type: string
+                    roles:
+                      items:
+                        description: |-
+                          PolicyRule holds information that describes a policy rule, but does not contain information
+                          about who the rule applies to or which namespace the rule applies to.
+                        properties:
+                          apiGroups:
+                            description: |-
+                              APIGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of
+                              the enumerated resources in any API group will be allowed. "" represents the core API group and "*" represents all API groups.
+                            items:
+                              type: string
+                            type: array
+                            x-kubernetes-list-type: atomic
+                          nonResourceURLs:
+                            description: |-
+                              NonResourceURLs is a set of partial urls that a user should have access to.  *s are allowed, but only as the full, final step in the path
+                              Since non-resource URLs are not namespaced, this field is only applicable for ClusterRoles referenced from a ClusterRoleBinding.
+                              Rules can either apply to API resources (such as "pods" or "secrets") or non-resource URL paths (such as "/api"),  but not both.
+                            items:
+                              type: string
+                            type: array
+                            x-kubernetes-list-type: atomic
+                          resourceNames:
+                            description: ResourceNames is an optional white list of
+                              names that the rule applies to.  An empty set means
+                              that everything is allowed.
+                            items:
+                              type: string
+                            type: array
+                            x-kubernetes-list-type: atomic
+                          resources:
+                            description: Resources is a list of resources this rule
+                              applies to. '*' represents all resources.
+                            items:
+                              type: string
+                            type: array
+                            x-kubernetes-list-type: atomic
+                          verbs:
+                            description: Verbs is a list of Verbs that apply to ALL
+                              the ResourceKinds contained in this rule. '*' represents
+                              all verbs.
+                            items:
+                              type: string
+                            type: array
+                            x-kubernetes-list-type: atomic
+                        required:
+                        - verbs
+                        type: object
+                      type: array
+                  required:
+                  - namespace
+                  - roles
+                  type: object
+                type: array
               observedGeneration:
                 format: int64
                 type: integer
-              role:
-                type: string
-              roleBinding:
-                type: string
-            required:
-            - role
-            - roleBinding
             type: object
         type: object
     served: true

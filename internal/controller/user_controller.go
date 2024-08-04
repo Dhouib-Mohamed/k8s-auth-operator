@@ -46,6 +46,11 @@ type UserReconciler struct {
 	Scheme *runtime.Scheme
 }
 
+type RoleBinding struct {
+	client.Object
+	Subjects []rbacv1.Subject
+}
+
 // +kubebuilder:rbac:groups=context.kube-auth,resources=users,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=context.kube-auth,resources=users/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=context.kube-auth,resources=users/finalizers,verbs=update
@@ -88,14 +93,35 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		roles = append(roles, fetchedRole)
 	}
 
-	err = r.createOrUpdateClusterRoleBinding(user, roles)
-	if err != nil {
-		return r.UpdateStatus(ctx, user, "", utils.BasicCondition{
-			Type:    contextv1.TypeNotReady,
-			Status:  contextv1.StatusFalse,
-			Reason:  "Error creating or updating cluster role binding",
-			Message: err.Error(),
-		}, err)
+	for _, role := range roles {
+		err := r.linkUserToRoleBinding(role.Name+"-namespace-role", "", rbacv1.Subject{
+			Kind:     "User",
+			Name:     user.Name,
+			APIGroup: "rbac.authorization.k8s.io",
+		})
+		if err != nil {
+			return r.UpdateStatus(ctx, user, "", utils.BasicCondition{
+				Type:    contextv1.TypeNotReady,
+				Status:  contextv1.StatusFalse,
+				Reason:  "Error creating or updating cluster role binding",
+				Message: err.Error(),
+			}, err)
+		}
+		for _, namespace := range role.Status.HandledNamespaces {
+			err := r.linkUserToRoleBinding(role.Name+"-"+namespace.Namespace, namespace.Namespace, rbacv1.Subject{
+				Kind:     "User",
+				Name:     user.Name,
+				APIGroup: "rbac.authorization.k8s.io",
+			})
+			if err != nil {
+				return r.UpdateStatus(ctx, user, "", utils.BasicCondition{
+					Type:    contextv1.TypeNotReady,
+					Status:  contextv1.StatusFalse,
+					Reason:  "Error creating or updating cluster role binding",
+					Message: err.Error(),
+				}, err)
+			}
+		}
 	}
 
 	kubeConfig := user.Status.KubeConfig
@@ -182,45 +208,83 @@ users:
 	return kubeConfig, nil
 }
 
-func (r *UserReconciler) createOrUpdateClusterRoleBinding(user *contextv1.User, roles []*contextv1.Role) error {
-	roleBinding := &rbacv1.ClusterRoleBinding{}
-	err := r.Get(context.TODO(), client.ObjectKey{
-		Name: user.Name + "-binding",
-	}, roleBinding)
-	if err != nil && !apierrors.IsNotFound(err) {
+func (r *UserReconciler) linkUserToRoleBinding(roleName string, namespace string, subject rbacv1.Subject) error {
+	var roleBinding client.Object
+	roleBindingName := roleName + "-binding"
+	var err error
+	if namespace == "" {
+		roleBinding = &rbacv1.ClusterRoleBinding{}
+		err = r.Get(context.TODO(), client.ObjectKey{
+			Name: roleBindingName,
+		}, roleBinding)
+	} else {
+		roleBinding = &rbacv1.RoleBinding{}
+		err = r.Get(context.TODO(), client.ObjectKey{
+			Namespace: namespace,
+			Name:      roleBindingName,
+		}, roleBinding)
+	}
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			if namespace == "" {
+				roleBinding = &rbacv1.ClusterRoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: roleBindingName,
+					},
+					Subjects: []rbacv1.Subject{subject},
+					RoleRef: rbacv1.RoleRef{
+						Kind:     "ClusterRole",
+						Name:     roleName,
+						APIGroup: "rbac.authorization.k8s.io",
+					},
+				}
+			} else {
+				roleBinding = &rbacv1.RoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: namespace,
+						Name:      roleBindingName,
+					},
+					Subjects: []rbacv1.Subject{subject},
+					RoleRef: rbacv1.RoleRef{
+						Kind:     "Role",
+						Name:     roleName,
+						APIGroup: "rbac.authorization.k8s.io",
+					},
+				}
+			}
+			err := r.Create(context.TODO(), roleBinding)
+			if err != nil {
+				return err
+			}
+			return nil
+		}
 		return err
 	}
-
-	if apierrors.IsNotFound(err) {
+	if namespace == "" {
 		roleBinding = &rbacv1.ClusterRoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: user.Name + "-binding",
+				Name: roleBindingName,
 			},
-			Subjects: []rbacv1.Subject{
-				{
-					Kind:     rbacv1.UserKind,
-					Name:     user.Name,
-					APIGroup: rbacv1.GroupName,
-				},
-			},
+			Subjects: append(roleBinding.(*rbacv1.ClusterRoleBinding).Subjects, subject),
 			RoleRef: rbacv1.RoleRef{
-				Kind: "ClusterRole",
-				Name: "cluster-admin", // or use a specific role based on your requirement
+				Kind:     "ClusterRole",
+				Name:     roleName,
+				APIGroup: "rbac.authorization.k8s.io",
 			},
 		}
-		return r.Create(context.TODO(), roleBinding)
-	}
-
-	roleBinding.Subjects = []rbacv1.Subject{
-		{
-			Kind:     rbacv1.UserKind,
-			Name:     user.Name,
-			APIGroup: rbacv1.GroupName,
-		},
-	}
-	roleBinding.RoleRef = rbacv1.RoleRef{
-		Kind: "ClusterRole",
-		Name: "cluster-admin", // or use a specific role based on your requirement
+	} else {
+		roleBinding = &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      roleBindingName,
+			},
+			Subjects: append(roleBinding.(*rbacv1.RoleBinding).Subjects, subject),
+			RoleRef: rbacv1.RoleRef{
+				Kind:     "Role",
+				Name:     roleName,
+				APIGroup: "rbac.authorization.k8s.io",
+			},
+		}
 	}
 	return r.Update(context.TODO(), roleBinding)
 }
