@@ -29,27 +29,6 @@ func createFilter(specialObjects []string) func(e event.CreateEvent) bool {
 	}
 }
 
-func deleteFilter(specialObjects []string) func(e event.DeleteEvent) bool {
-	return func(e event.TypedDeleteEvent[client.Object]) bool {
-		return !e.DeleteStateUnknown
-	}
-}
-
-func getStatus(obj client.Object) interface{} {
-	val := reflect.ValueOf(obj).Elem()
-	statusField := val.FieldByName("Status")
-	if !statusField.IsValid() {
-		return nil
-	}
-	return statusField.Interface()
-}
-
-func statusChanged(oldObj, newObj client.Object) bool {
-	oldStatus := getStatus(oldObj)
-	newStatus := getStatus(newObj)
-	return !reflect.DeepEqual(oldStatus, newStatus)
-}
-
 func updateFilter(specialObjects []string) func(e event.UpdateEvent) bool {
 	return func(e event.TypedUpdateEvent[client.Object]) bool {
 		if e.ObjectOld.GetGeneration() != e.ObjectNew.GetGeneration() {
@@ -71,8 +50,29 @@ func updateFilter(specialObjects []string) func(e event.UpdateEvent) bool {
 	}
 }
 
+func deleteFilter(specialObjects []string) func(e event.DeleteEvent) bool {
+	return func(e event.TypedDeleteEvent[client.Object]) bool {
+		return !e.DeleteStateUnknown
+	}
+}
+
 func genericFilter(specialObjects []string) func(e event.GenericEvent) bool {
 	return func(e event.GenericEvent) bool {
 		return false
 	}
+}
+
+func getStatus(obj client.Object) interface{} {
+	val := reflect.ValueOf(obj).Elem()
+	statusField := val.FieldByName("Status")
+	if !statusField.IsValid() {
+		return nil
+	}
+	return statusField.Interface()
+}
+
+func statusChanged(oldObj, newObj client.Object) bool {
+	oldStatus := getStatus(oldObj)
+	newStatus := getStatus(newObj)
+	return !reflect.DeepEqual(oldStatus, newStatus)
 }

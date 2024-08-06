@@ -17,7 +17,10 @@ type BasicCondition struct {
 }
 
 func compareConditions(newCondition BasicCondition, oldCondition v1.ContextCondition) bool {
-	return newCondition.Type == oldCondition.Type && newCondition.Status == oldCondition.Status && newCondition.Reason == oldCondition.Reason && newCondition.Message == oldCondition.Message
+	return newCondition.Type == oldCondition.Type &&
+		newCondition.Status == oldCondition.Status &&
+		newCondition.Reason == oldCondition.Reason &&
+		newCondition.Message == oldCondition.Message
 }
 
 func incrementConditions(conditions []v1.ContextCondition, newCondition BasicCondition) []v1.ContextCondition {

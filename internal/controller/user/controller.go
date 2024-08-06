@@ -151,7 +151,6 @@ func (r *UserReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&contextv1.User{}).
 		Watches(&contextv1.Role{}, handler.EnqueueRequestsFromMapFunc(
 			func(ctx context.Context, object client.Object) []reconcile.Request {
-				// List all Users resources and create a request for each one that has the changed role
 				users := &contextv1.UserList{}
 				err := r.List(ctx, users)
 				if err != nil {

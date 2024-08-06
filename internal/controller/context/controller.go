@@ -113,18 +113,15 @@ func (r *ContextReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 func (r *ContextReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
-	// Watch for changes on namespaces creation or deletion
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&contextv1.Context{}).
 		Watches(&corev1.Namespace{}, handler.EnqueueRequestsFromMapFunc(
 			func(ctx context.Context, object client.Object) []reconcile.Request {
-				// List all Context resources and create a request for each
 				contextList := &contextv1.ContextList{}
 				if err := mgr.GetClient().List(ctx, contextList); err != nil {
 					log.Log.Error(err, "Failed to list Context resources")
 					return nil
 				}
-
 				var requests []reconcile.Request
 				for _, context := range contextList.Items {
 					requests = append(requests, reconcile.Request{
@@ -162,10 +159,6 @@ func (r *ContextReconciler) UpdateStatus(ctx context.Context, context *contextv1
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, updateErr
-	}
-	err := r.Status().Update(ctx, context)
-	if err != nil {
-		return ctrl.Result{}, err
 	}
 	return utils.HandleError(logger, Error, condition.Message)
 }

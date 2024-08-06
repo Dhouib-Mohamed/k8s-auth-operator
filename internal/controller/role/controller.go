@@ -119,13 +119,11 @@ func (r *RoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	}, nil)
 }
 
-// SetupWithManager sets up the controller with the Manager.
 func (r *RoleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&contextv1.Role{}).
 		Watches(&contextv1.Context{}, handler.EnqueueRequestsFromMapFunc(
 			func(ctx context.Context, object client.Object) []reconcile.Request {
-				// List all Role resources and create a request for each
 				roles := &contextv1.RoleList{}
 				err := r.List(ctx, roles)
 				if err != nil {
