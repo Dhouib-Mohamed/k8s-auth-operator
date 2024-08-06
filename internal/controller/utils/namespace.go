@@ -66,5 +66,17 @@ func NamespacesEqual(a, b []string) bool {
 			return false
 		}
 	}
+	for _, ns := range b {
+		found := false
+		for _, ns2 := range a {
+			if ns == ns2 {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
 	return true
 }

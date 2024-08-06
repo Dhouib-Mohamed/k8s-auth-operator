@@ -20,13 +20,15 @@ import (
 	"context"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	contextv1 "kube-auth.io/api/v1"
 	"kube-auth.io/internal/controller/utils"
+	"reflect"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 // RoleReconciler reconciles a Role object
@@ -81,30 +83,27 @@ func (r *RoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 			Message: err.Error(),
 		}, err)
 	}
+	for _, handledNs := range handledNamespaces {
+		err = r.createOrUpdateRole(CRDRole.Name+"-"+handledNs.Namespace, handledNs.Namespace, handledNs.Roles)
+		if err != nil {
+			return r.UpdateStatus(ctx, CRDRole, nil, utils.BasicCondition{
+				Type:    contextv1.TypeNotReady,
+				Status:  contextv1.StatusFalse,
+				Reason:  "Error creating role",
+				Message: err.Error(),
+			}, err)
+		}
+	}
 	for _, existentNs := range CRDRole.Status.HandledNamespaces {
 		found := false
 		for _, handledNs := range handledNamespaces {
 			if existentNs.Namespace == handledNs.Namespace {
 				found = true
-				err = r.createOrUpdateRole(CRDRole.Name+"-"+handledNs.Namespace, handledNs.Namespace, handledNs.Roles)
-				if err != nil {
-					return r.UpdateStatus(ctx, CRDRole, nil, utils.BasicCondition{
-						Type:    contextv1.TypeNotReady,
-						Status:  contextv1.StatusFalse,
-						Reason:  "Error creating role",
-						Message: err.Error(),
-					}, err)
-				}
 				break
 			}
 		}
 		if !found {
-			err = r.Delete(ctx, &rbacv1.Role{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      CRDRole.Name + "-" + existentNs.Namespace,
-					Namespace: existentNs.Namespace,
-				},
-			})
+			err = r.deleteRole(CRDRole.Name+"-"+existentNs.Namespace, existentNs.Namespace)
 			if err != nil {
 				return r.UpdateStatus(ctx, CRDRole, nil, utils.BasicCondition{
 					Type:    contextv1.TypeNotReady,
@@ -123,13 +122,43 @@ func (r *RoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	}, nil)
 }
 
-// SetupWithManager sets up the controller with the Manager.
 func (r *RoleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&contextv1.Role{}).
-		WithEventFilter(utils.FilterFuncs()).
-		//Owns(&rbacv1.ClusterRole{}).
-		//Owns(&rbacv1.ClusterRoleBinding{}).
+		Watches(&contextv1.Context{}, handler.EnqueueRequestsFromMapFunc(
+			func(ctx context.Context, object client.Object) []reconcile.Request {
+				roles := &contextv1.RoleList{}
+				err := r.List(ctx, roles)
+				if err != nil {
+					return nil
+				}
+				var requests []reconcile.Request
+				for _, item := range roles.Items {
+					for _, role := range item.Spec.ClusterRole {
+						pass := false
+						for _, context := range role.Contexts {
+							if context == object.GetName() {
+								requests = append(requests, reconcile.Request{
+									NamespacedName: client.ObjectKey{
+										Namespace: item.Namespace,
+										Name:      item.Name,
+									},
+								})
+								pass = true
+								break
+							}
+						}
+						if pass {
+							break
+						}
+					}
+				}
+				return requests
+			}),
+		).
+		Owns(&rbacv1.Role{}).
+		Owns(&rbacv1.RoleBinding{}).
+		WithEventFilter(utils.FilterFuncs([]string{"*v1.Context"})).
 		Complete(r)
 }
 
@@ -138,12 +167,21 @@ func (r *RoleReconciler) UpdateStatus(ctx context.Context, role *contextv1.Role,
 	if role == nil {
 		return utils.HandleError(logger, Error, condition.Message)
 	}
+
+	newConditions := utils.SyncConditions(role.Status.Conditions, condition)
+	if reflect.DeepEqual(role.Status.Conditions, newConditions) && reflect.DeepEqual(handledNamespaces, role.Status.HandledNamespaces) {
+		return ctrl.Result{}, nil
+	}
 	role.Status.HandledNamespaces = handledNamespaces
+	role.Status.Conditions = newConditions
 	role.Status.ObservedGeneration = role.Status.ObservedGeneration + 1
-	role.Status.Conditions = utils.SyncConditions(role.Status.Conditions, condition)
-	err := r.Status().Update(ctx, role)
-	if err != nil {
-		return ctrl.Result{}, err
+	updateErr := r.Status().Update(ctx, role)
+	if updateErr != nil {
+		if errors.IsConflict(updateErr) {
+			logger.Info("Conflict while updating status, retrying")
+			return ctrl.Result{}, nil
+		}
+		return ctrl.Result{}, updateErr
 	}
 	return utils.HandleError(logger, Error, condition.Message)
 }

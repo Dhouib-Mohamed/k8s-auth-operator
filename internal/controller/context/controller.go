@@ -23,9 +23,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	contextv1 "kube-auth.io/api/v1"
 	"kube-auth.io/internal/controller/utils"
+	"reflect"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 // ContextReconciler reconciles a Context object
@@ -110,11 +113,28 @@ func (r *ContextReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 func (r *ContextReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
-	// Watch for changes on namespaces creation or deletion
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&contextv1.Context{}).
-		WithEventFilter(utils.FilterFuncs()).
-		//Watches(&source.Kind{Type: &corev1.Namespace{}}, &handler.EnqueueRequestForObject{}).
+		Watches(&corev1.Namespace{}, handler.EnqueueRequestsFromMapFunc(
+			func(ctx context.Context, object client.Object) []reconcile.Request {
+				contextList := &contextv1.ContextList{}
+				if err := mgr.GetClient().List(ctx, contextList); err != nil {
+					log.Log.Error(err, "Failed to list Context resources")
+					return nil
+				}
+				var requests []reconcile.Request
+				for _, context := range contextList.Items {
+					requests = append(requests, reconcile.Request{
+						NamespacedName: client.ObjectKey{
+							Name:      context.Name,
+							Namespace: context.Namespace,
+						},
+					})
+				}
+				return requests
+			},
+		)).
+		WithEventFilter(utils.FilterFuncs([]string{"*v1.Namespace"})).
 		Complete(r)
 }
 
@@ -123,12 +143,22 @@ func (r *ContextReconciler) UpdateStatus(ctx context.Context, context *contextv1
 	if context == nil {
 		return utils.HandleError(logger, Error, condition.Message)
 	}
+
+	newConditions := utils.SyncConditions(context.Status.Conditions, condition)
+	if reflect.DeepEqual(context.Status.Conditions, newConditions) && utils.NamespacesEqual(namespaces, context.Status.SyncedNamespaces) {
+		return ctrl.Result{}, nil
+	}
 	context.Status.SyncedNamespaces = namespaces
+	context.Status.Conditions = newConditions
 	context.Status.ObservedGeneration = context.Status.ObservedGeneration + 1
-	context.Status.Conditions = utils.SyncConditions(context.Status.Conditions, condition)
-	err := r.Status().Update(ctx, context)
-	if err != nil {
-		return ctrl.Result{}, err
+
+	updateErr := r.Status().Update(ctx, context)
+	if updateErr != nil {
+		if errors.IsConflict(updateErr) {
+			logger.Info("Conflict while updating status, retrying")
+			return ctrl.Result{}, nil
+		}
+		return ctrl.Result{}, updateErr
 	}
 	return utils.HandleError(logger, Error, condition.Message)
 }

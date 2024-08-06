@@ -18,15 +18,18 @@ package user
 
 import (
 	"context"
+	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	contextv1 "kube-auth.io/api/v1"
 	"kube-auth.io/internal/controller/utils"
+	"reflect"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	rbacv1 "k8s.io/api/rbac/v1"
-	contextv1 "kube-auth.io/api/v1"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 // UserReconciler reconciles a User object
@@ -146,7 +149,33 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 func (r *UserReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&contextv1.User{}).
-		WithEventFilter(utils.FilterFuncs()).
+		Watches(&contextv1.Role{}, handler.EnqueueRequestsFromMapFunc(
+			func(ctx context.Context, object client.Object) []reconcile.Request {
+				users := &contextv1.UserList{}
+				err := r.List(ctx, users)
+				if err != nil {
+					log.Log.Error(err, "Failed to list User resources")
+					return nil
+				}
+				var requests []reconcile.Request
+				for _, user := range users.Items {
+					for _, role := range user.Spec.Roles {
+						if role == object.GetName() {
+							requests = append(requests, reconcile.Request{
+								NamespacedName: client.ObjectKey{
+									Namespace: user.Namespace,
+									Name:      user.Name,
+								},
+							})
+						}
+					}
+				}
+				return requests
+			},
+		)).
+		Owns(&rbacv1.ClusterRoleBinding{}).
+		Owns(&rbacv1.RoleBinding{}).
+		WithEventFilter(utils.FilterFuncs([]string{"*v1.Role"})).
 		Complete(r)
 }
 
@@ -155,12 +184,20 @@ func (r *UserReconciler) UpdateStatus(ctx context.Context, user *contextv1.User,
 	if user == nil {
 		return utils.HandleError(logger, Error, condition.Message)
 	}
+	newConditions := utils.SyncConditions(user.Status.Conditions, condition)
+	if reflect.DeepEqual(user.Status.Conditions, newConditions) && reflect.DeepEqual(kubeConfig, user.Status.KubeConfig) {
+		return ctrl.Result{}, nil
+	}
 	user.Status.KubeConfig = kubeConfig
 	user.Status.ObservedGeneration = user.Status.ObservedGeneration + 1
-	user.Status.Conditions = utils.SyncConditions(user.Status.Conditions, condition)
-	err := r.Status().Update(ctx, user)
-	if err != nil {
-		return ctrl.Result{}, err
+	user.Status.Conditions = newConditions
+	updateErr := r.Status().Update(ctx, user)
+	if updateErr != nil {
+		if errors.IsConflict(updateErr) {
+			logger.Info("Conflict while updating status, retrying")
+			return ctrl.Result{}, nil
+		}
+		return ctrl.Result{}, updateErr
 	}
 	return utils.HandleError(logger, Error, condition.Message)
 }
