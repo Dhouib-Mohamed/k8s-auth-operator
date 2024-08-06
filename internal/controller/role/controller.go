@@ -18,6 +18,7 @@ package role
 
 import (
 	"context"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	contextv1 "kube-auth.io/api/v1"
@@ -82,20 +83,22 @@ func (r *RoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 			Message: err.Error(),
 		}, err)
 	}
+	for _, handledNs := range handledNamespaces {
+		err = r.createOrUpdateRole(CRDRole.Name+"-"+handledNs.Namespace, handledNs.Namespace, handledNs.Roles)
+		if err != nil {
+			return r.UpdateStatus(ctx, CRDRole, nil, utils.BasicCondition{
+				Type:    contextv1.TypeNotReady,
+				Status:  contextv1.StatusFalse,
+				Reason:  "Error creating role",
+				Message: err.Error(),
+			}, err)
+		}
+	}
 	for _, existentNs := range CRDRole.Status.HandledNamespaces {
 		found := false
 		for _, handledNs := range handledNamespaces {
 			if existentNs.Namespace == handledNs.Namespace {
 				found = true
-				err = r.createOrUpdateRole(CRDRole.Name+"-"+handledNs.Namespace, handledNs.Namespace, handledNs.Roles)
-				if err != nil {
-					return r.UpdateStatus(ctx, CRDRole, nil, utils.BasicCondition{
-						Type:    contextv1.TypeNotReady,
-						Status:  contextv1.StatusFalse,
-						Reason:  "Error creating role",
-						Message: err.Error(),
-					}, err)
-				}
 				break
 			}
 		}
@@ -153,6 +156,8 @@ func (r *RoleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				return requests
 			}),
 		).
+		Owns(&rbacv1.Role{}).
+		Owns(&rbacv1.RoleBinding{}).
 		WithEventFilter(utils.FilterFuncs([]string{"*v1.Context"})).
 		Complete(r)
 }

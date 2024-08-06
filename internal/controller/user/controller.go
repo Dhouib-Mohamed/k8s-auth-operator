@@ -173,6 +173,8 @@ func (r *UserReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				return requests
 			},
 		)).
+		Owns(&rbacv1.ClusterRoleBinding{}).
+		Owns(&rbacv1.RoleBinding{}).
 		WithEventFilter(utils.FilterFuncs([]string{"*v1.Role"})).
 		Complete(r)
 }
