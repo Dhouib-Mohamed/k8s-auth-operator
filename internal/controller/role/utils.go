@@ -2,6 +2,7 @@ package role
 
 import (
 	"context"
+	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -89,7 +90,7 @@ func (r *RoleReconciler) createNamespacesRole(name string, nsRole contextv1.Name
 	if *nsRole.Delete {
 		rule.Verbs = append(rule.Verbs, "delete")
 	}
-	return r.createOrUpdateRole(name+"namespace-role", "", []rbacv1.PolicyRule{rule})
+	return r.createOrUpdateRole(name+"-namespace-role", "", []rbacv1.PolicyRule{rule})
 }
 
 func (r *RoleReconciler) createOrUpdateRole(roleName string, namespace string, rules []rbacv1.PolicyRule) error {
@@ -120,6 +121,43 @@ func (r *RoleReconciler) createOrUpdateRole(roleName string, namespace string, r
 		} else {
 			return err
 		}
+	}
+	return nil
+}
+
+func (r *RoleReconciler) deleteRole(roleName string, namespace string) error {
+	var role client.Object
+	if namespace == "" {
+		role = &rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: roleName,
+			},
+		}
+	} else {
+		namespaceObj := &corev1.Namespace{}
+		err := r.Get(context.Background(), types.NamespacedName{Name: namespace}, namespaceObj)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}
+		if namespaceObj.Status.Phase == corev1.NamespaceTerminating {
+			return nil
+		}
+		role = &rbacv1.Role{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      roleName,
+				Namespace: namespace,
+			},
+		}
+	}
+	err := r.Delete(context.Background(), role)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil
+		}
+		return err
 	}
 	return nil
 }
