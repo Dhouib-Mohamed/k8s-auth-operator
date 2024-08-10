@@ -42,7 +42,6 @@ spec:
                   type: string
                 minItems: 1
                 type: array
-                uniqueItems: true
             required:
             - roles
             type: object
@@ -75,6 +74,8 @@ spec:
             required:
             - kubeConfig
             type: object
+        required:
+        - spec
         type: object
     served: true
     storage: true

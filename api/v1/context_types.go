@@ -21,10 +21,8 @@ import (
 )
 
 type ContextSpec struct {
-	// +kubebuilder:default:=[]
 	Namespaces []string `json:"namespaces,omitempty"`
-	// +kubebuilder:default:=[]
-	Find []string `json:"find,omitempty"`
+	Find       []string `json:"find,omitempty"`
 }
 
 type ContextStatus struct {
@@ -40,7 +38,7 @@ type Context struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ContextSpec   `json:"spec,omitempty"`
+	Spec   ContextSpec   `json:"spec"`
 	Status ContextStatus `json:"status,omitempty"`
 }
 

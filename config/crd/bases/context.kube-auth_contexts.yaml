@@ -38,12 +38,10 @@ spec:
           spec:
             properties:
               find:
-                default: '[]'
                 items:
                   type: string
                 type: array
               namespaces:
-                default: '[]'
                 items:
                   type: string
                 type: array
@@ -77,6 +75,8 @@ spec:
                   type: string
                 type: array
             type: object
+        required:
+        - spec
         type: object
     served: true
     storage: true

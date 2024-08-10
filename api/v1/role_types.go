@@ -21,11 +21,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// +kubebuilder:validation:Enum=get;list;watch;create;update;patch;delete;deletecollection
+type RoleVerb string
+
+// +kubebuilder:validation:Enum=pod;deployment;service;configmap;secret;ingress;persistentvolumeclaim;persistentvolume;serviceaccount;role;rolebinding;clusterrole;clusterrolebinding;namespace;networkpolicy;podsecuritypolicy;limitrange;resourcequota;horizontalpodautoscaler;poddisruptionbudget;priorityclass;storageclass;volumeattachment;csidriver;csinode;customresourcedefinition;mutatingwebhookconfiguration;validatingwebhookconfiguration;customresourcedefinitionlist;mutatingwebhookconfigurationlist;validatingwebhookconfigurationlist;podlist;deploymentlist;servicelist;configmaplist;secretlist;ingresslist;persistentvolumeclaimlist;persistentvolumelist;serviceaccountlist;rolelist;rolebindinglist;clusterrolelist;clusterrolebindinglist;namespacelist;networkpolicylist;podsecuritypolicylist;limitrangelist;resourcequotalist;horizontalpodautoscalerlist;poddisruptionbudgetlist;priorityclasslist;storageclasslist;volumeattachmentlist;csidriverlist;csinodelist;customresourcedefinitionlistlist;mutatingwebhookconfigurationlistlist;validatingwebhookconfigurationlistlist
+type RoleResource string
+
 type ResourceInstances struct {
-	// +kubebuilder:validation:Enum=pod;deployment;service;configmap;secret;ingress;persistentvolumeclaim;persistentvolume;serviceaccount;role;rolebinding;clusterrole;clusterrolebinding;namespace;networkpolicy;podsecuritypolicy;limitrange;resourcequota;horizontalpodautoscaler;poddisruptionbudget;priorityclass;storageclass;volumeattachment;csidriver;csinode;customresourcedefinition;mutatingwebhookconfiguration;validatingwebhookconfiguration;customresourcedefinitionlist;mutatingwebhookconfigurationlist;validatingwebhookconfigurationlist;podlist;deploymentlist;servicelist;configmaplist;secretlist;ingresslist;persistentvolumeclaimlist;persistentvolumelist;serviceaccountlist;rolelist;rolebindinglist;clusterrolelist;clusterrolebindinglist;namespacelist;networkpolicylist;podsecuritypolicylist;limitrangelist;resourcequotalist;horizontalpodautoscalerlist;poddisruptionbudgetlist;priorityclasslist;storageclasslist;volumeattachmentlist;csidriverlist;csinodelist;customresourcedefinitionlistlist;mutatingwebhookconfigurationlistlist;validatingwebhookconfigurationlistlist
-	Kind string `json:"kind"`
+	Kind RoleResource `json:"kind"`
 	// +kubebuilder:validation:MinItems=1
-	// +kubebuilder:validation:UniqueItems=true
 	Name []string `json:"name"`
 }
 
@@ -34,28 +38,19 @@ type NamespaceRole struct {
 	Delete *bool `json:"delete"`
 }
 
-// +kubebuilder:validation:Enum=get;list;watch;create;update;patch;delete;deletecollection
-type RoleVerb string
-
 type ClusterRole struct {
-	// +kubebuilder:default:=[]
-	Contexts []string `json:"contexts,omitempty"`
-	// +kubebuilder:default:=[]
-	Namespaces []string `json:"namespaces,omitempty"`
-	// +kubebuilder:default:=[]
-	// +kubebuilder:validation:UniqueItems=true
-	Resources []string `json:"resources,omitempty"`
-	// +kubebuilder:default:=[]
-	// +kubebuilder:validation:UniqueItems=true
-	Instances []ResourceInstances `json:"instances,omitempty"`
+	Contexts   []string            `json:"contexts,omitempty"`
+	Namespaces []string            `json:"namespaces,omitempty"`
+	Resources  []RoleResource      `json:"resources,omitempty"`
+	Instances  []ResourceInstances `json:"instances,omitempty"`
 	// +kubebuilder:validation:MinItems=1
-	// +kubebuilder:validation:UniqueItems=true
 	Verbs []RoleVerb `json:"verbs"`
 }
 
 type RoleSpec struct {
-	NamespaceRole NamespaceRole `json:"namespaceRole"`
-	ClusterRole   []ClusterRole `json:"clusterRole"`
+	NamespaceRole NamespaceRole `json:"namespaceRole,omitempty"`
+	// +kubebuilder:validation:MinItems=1
+	ClusterRole []ClusterRole `json:"clusterRole"`
 }
 
 type HandledNamespace struct {
@@ -76,7 +71,7 @@ type Role struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   RoleSpec   `json:"spec,omitempty"`
+	Spec   RoleSpec   `json:"spec"`
 	Status RoleStatus `json:"status,omitempty"`
 }
 

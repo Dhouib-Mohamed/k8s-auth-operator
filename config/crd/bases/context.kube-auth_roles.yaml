@@ -41,12 +41,10 @@ spec:
                 items:
                   properties:
                     contexts:
-                      default: '[]'
                       items:
                         type: string
                       type: array
                     instances:
-                      default: '[]'
                       items:
                         properties:
                           kind:
@@ -116,24 +114,79 @@ spec:
                               type: string
                             minItems: 1
                             type: array
-                            uniqueItems: true
                         required:
                         - kind
                         - name
                         type: object
                       type: array
-                      uniqueItems: true
                     namespaces:
-                      default: '[]'
                       items:
                         type: string
                       type: array
                     resources:
-                      default: '[]'
                       items:
+                        enum:
+                        - pod
+                        - deployment
+                        - service
+                        - configmap
+                        - secret
+                        - ingress
+                        - persistentvolumeclaim
+                        - persistentvolume
+                        - serviceaccount
+                        - role
+                        - rolebinding
+                        - clusterrole
+                        - clusterrolebinding
+                        - namespace
+                        - networkpolicy
+                        - podsecuritypolicy
+                        - limitrange
+                        - resourcequota
+                        - horizontalpodautoscaler
+                        - poddisruptionbudget
+                        - priorityclass
+                        - storageclass
+                        - volumeattachment
+                        - csidriver
+                        - csinode
+                        - customresourcedefinition
+                        - mutatingwebhookconfiguration
+                        - validatingwebhookconfiguration
+                        - customresourcedefinitionlist
+                        - mutatingwebhookconfigurationlist
+                        - validatingwebhookconfigurationlist
+                        - podlist
+                        - deploymentlist
+                        - servicelist
+                        - configmaplist
+                        - secretlist
+                        - ingresslist
+                        - persistentvolumeclaimlist
+                        - persistentvolumelist
+                        - serviceaccountlist
+                        - rolelist
+                        - rolebindinglist
+                        - clusterrolelist
+                        - clusterrolebindinglist
+                        - namespacelist
+                        - networkpolicylist
+                        - podsecuritypolicylist
+                        - limitrangelist
+                        - resourcequotalist
+                        - horizontalpodautoscalerlist
+                        - poddisruptionbudgetlist
+                        - priorityclasslist
+                        - storageclasslist
+                        - volumeattachmentlist
+                        - csidriverlist
+                        - csinodelist
+                        - customresourcedefinitionlistlist
+                        - mutatingwebhookconfigurationlistlist
+                        - validatingwebhookconfigurationlistlist
                         type: string
                       type: array
-                      uniqueItems: true
                     verbs:
                       items:
                         enum:
@@ -148,10 +201,10 @@ spec:
                         type: string
                       minItems: 1
                       type: array
-                      uniqueItems: true
                   required:
                   - verbs
                   type: object
+                minItems: 1
                 type: array
               namespaceRole:
                 properties:
@@ -165,7 +218,6 @@ spec:
                 type: object
             required:
             - clusterRole
-            - namespaceRole
             type: object
           status:
             properties:
@@ -252,6 +304,8 @@ spec:
                 format: int64
                 type: integer
             type: object
+        required:
+        - spec
         type: object
     served: true
     storage: true
