@@ -21,10 +21,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 type ResourceInstances struct {
-	Kind string   `json:"kind"`
+	// +kubebuilder:validation:Enum=pod;deployment;service;configmap;secret;ingress;persistentvolumeclaim;persistentvolume;serviceaccount;role;rolebinding;clusterrole;clusterrolebinding;namespace;networkpolicy;podsecuritypolicy;limitrange;resourcequota;horizontalpodautoscaler;poddisruptionbudget;priorityclass;storageclass;volumeattachment;csidriver;csinode;customresourcedefinition;mutatingwebhookconfiguration;validatingwebhookconfiguration;customresourcedefinitionlist;mutatingwebhookconfigurationlist;validatingwebhookconfigurationlist;podlist;deploymentlist;servicelist;configmaplist;secretlist;ingresslist;persistentvolumeclaimlist;persistentvolumelist;serviceaccountlist;rolelist;rolebindinglist;clusterrolelist;clusterrolebindinglist;namespacelist;networkpolicylist;podsecuritypolicylist;limitrangelist;resourcequotalist;horizontalpodautoscalerlist;poddisruptionbudgetlist;priorityclasslist;storageclasslist;volumeattachmentlist;csidriverlist;csinodelist;customresourcedefinitionlistlist;mutatingwebhookconfigurationlistlist;validatingwebhookconfigurationlistlist
+	Kind string `json:"kind"`
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:UniqueItems=true
 	Name []string `json:"name"`
 }
 
@@ -33,15 +34,25 @@ type NamespaceRole struct {
 	Delete *bool `json:"delete"`
 }
 
+// +kubebuilder:validation:Enum=get;list;watch;create;update;patch;delete;deletecollection
+type RoleVerb string
+
 type ClusterRole struct {
-	Contexts   []string            `json:"contexts"`
-	Namespaces []string            `json:"namespaces"`
-	Resources  []string            `json:"resources"`
-	Instances  []ResourceInstances `json:"instances"`
-	Verbs      []string            `json:"verbs"`
+	// +kubebuilder:default:=[]
+	Contexts []string `json:"contexts,omitempty"`
+	// +kubebuilder:default:=[]
+	Namespaces []string `json:"namespaces,omitempty"`
+	// +kubebuilder:default:=[]
+	// +kubebuilder:validation:UniqueItems=true
+	Resources []string `json:"resources,omitempty"`
+	// +kubebuilder:default:=[]
+	// +kubebuilder:validation:UniqueItems=true
+	Instances []ResourceInstances `json:"instances,omitempty"`
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:UniqueItems=true
+	Verbs []RoleVerb `json:"verbs"`
 }
 
-// RoleSpec defines the desired state of Role
 type RoleSpec struct {
 	NamespaceRole NamespaceRole `json:"namespaceRole"`
 	ClusterRole   []ClusterRole `json:"clusterRole"`
@@ -52,7 +63,6 @@ type HandledNamespace struct {
 	Roles     []rbacv1.PolicyRule `json:"roles"`
 }
 
-// RoleStatus defines the observed state of Role
 type RoleStatus struct {
 	HandledNamespaces  []HandledNamespace `json:"handledNamespaces,omitempty"`
 	ObservedGeneration int64              `json:"observedGeneration,omitempty"`
@@ -62,7 +72,6 @@ type RoleStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 
-// Role is the Schema for the roles API
 type Role struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -73,7 +82,6 @@ type Role struct {
 
 // +kubebuilder:object:root=true
 
-// RoleList contains a list of Role
 type RoleList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

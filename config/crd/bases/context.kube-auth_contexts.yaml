@@ -17,7 +17,6 @@ spec:
   - name: v1
     schema:
       openAPIV3Schema:
-        description: Context is the Schema for the contexts API
         properties:
           apiVersion:
             description: |-
@@ -37,24 +36,19 @@ spec:
           metadata:
             type: object
           spec:
-            description: ContextSpec defines the desired state of Context
             properties:
               find:
-                description: Find is a regex pattern to match namespaces
+                default: '[]'
                 items:
                   type: string
                 type: array
               namespaces:
-                description: |-
-                  INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-                  Important: Run "make" to regenerate code after modifying this file
-                  Namespaces is the list of namespaces that are grouped in this context
+                default: '[]'
                 items:
                   type: string
                 type: array
             type: object
           status:
-            description: ContextStatus defines the observed state of Context
             properties:
               conditions:
                 items:
@@ -79,10 +73,6 @@ spec:
                 format: int64
                 type: integer
               syncedNamespaces:
-                description: |-
-                  INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-                  Important: Run "make" to regenerate code after modifying this file
-                  SyncedNamespaces is the list of namespaces that match the context
                 items:
                   type: string
                 type: array
