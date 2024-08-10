@@ -20,24 +20,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
-// ContextSpec defines the desired state of Context
 type ContextSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-	// Namespaces is the list of namespaces that are grouped in this context
 	Namespaces []string `json:"namespaces,omitempty"`
-	// Find is a regex pattern to match namespaces
-	Find []string `json:"find,omitempty"`
+	Find       []string `json:"find,omitempty"`
 }
 
-// ContextStatus defines the observed state of Context
 type ContextStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-	// SyncedNamespaces is the list of namespaces that match the context
 	SyncedNamespaces   []string           `json:"syncedNamespaces,omitempty"`
 	ObservedGeneration int64              `json:"observedGeneration,omitempty"`
 	Conditions         []ContextCondition `json:"conditions,omitempty"`
@@ -46,18 +34,16 @@ type ContextStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 
-// Context is the Schema for the contexts API
 type Context struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ContextSpec   `json:"spec,omitempty"`
+	Spec   ContextSpec   `json:"spec"`
 	Status ContextStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// ContextList contains a list of Context
 type ContextList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

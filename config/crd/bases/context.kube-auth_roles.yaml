@@ -17,7 +17,6 @@ spec:
   - name: v1
     schema:
       openAPIV3Schema:
-        description: Role is the Schema for the roles API
         properties:
           apiVersion:
             description: |-
@@ -37,7 +36,6 @@ spec:
           metadata:
             type: object
           spec:
-            description: RoleSpec defines the desired state of Role
             properties:
               clusterRole:
                 items:
@@ -48,15 +46,73 @@ spec:
                       type: array
                     instances:
                       items:
-                        description: |-
-                          EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-                          NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
                         properties:
                           kind:
+                            enum:
+                            - pod
+                            - deployment
+                            - service
+                            - configmap
+                            - secret
+                            - ingress
+                            - persistentvolumeclaim
+                            - persistentvolume
+                            - serviceaccount
+                            - role
+                            - rolebinding
+                            - clusterrole
+                            - clusterrolebinding
+                            - namespace
+                            - networkpolicy
+                            - podsecuritypolicy
+                            - limitrange
+                            - resourcequota
+                            - horizontalpodautoscaler
+                            - poddisruptionbudget
+                            - priorityclass
+                            - storageclass
+                            - volumeattachment
+                            - csidriver
+                            - csinode
+                            - customresourcedefinition
+                            - mutatingwebhookconfiguration
+                            - validatingwebhookconfiguration
+                            - customresourcedefinitionlist
+                            - mutatingwebhookconfigurationlist
+                            - validatingwebhookconfigurationlist
+                            - podlist
+                            - deploymentlist
+                            - servicelist
+                            - configmaplist
+                            - secretlist
+                            - ingresslist
+                            - persistentvolumeclaimlist
+                            - persistentvolumelist
+                            - serviceaccountlist
+                            - rolelist
+                            - rolebindinglist
+                            - clusterrolelist
+                            - clusterrolebindinglist
+                            - namespacelist
+                            - networkpolicylist
+                            - podsecuritypolicylist
+                            - limitrangelist
+                            - resourcequotalist
+                            - horizontalpodautoscalerlist
+                            - poddisruptionbudgetlist
+                            - priorityclasslist
+                            - storageclasslist
+                            - volumeattachmentlist
+                            - csidriverlist
+                            - csinodelist
+                            - customresourcedefinitionlistlist
+                            - mutatingwebhookconfigurationlistlist
+                            - validatingwebhookconfigurationlistlist
                             type: string
                           name:
                             items:
                               type: string
+                            minItems: 1
                             type: array
                         required:
                         - kind
@@ -69,19 +125,86 @@ spec:
                       type: array
                     resources:
                       items:
+                        enum:
+                        - pod
+                        - deployment
+                        - service
+                        - configmap
+                        - secret
+                        - ingress
+                        - persistentvolumeclaim
+                        - persistentvolume
+                        - serviceaccount
+                        - role
+                        - rolebinding
+                        - clusterrole
+                        - clusterrolebinding
+                        - namespace
+                        - networkpolicy
+                        - podsecuritypolicy
+                        - limitrange
+                        - resourcequota
+                        - horizontalpodautoscaler
+                        - poddisruptionbudget
+                        - priorityclass
+                        - storageclass
+                        - volumeattachment
+                        - csidriver
+                        - csinode
+                        - customresourcedefinition
+                        - mutatingwebhookconfiguration
+                        - validatingwebhookconfiguration
+                        - customresourcedefinitionlist
+                        - mutatingwebhookconfigurationlist
+                        - validatingwebhookconfigurationlist
+                        - podlist
+                        - deploymentlist
+                        - servicelist
+                        - configmaplist
+                        - secretlist
+                        - ingresslist
+                        - persistentvolumeclaimlist
+                        - persistentvolumelist
+                        - serviceaccountlist
+                        - rolelist
+                        - rolebindinglist
+                        - clusterrolelist
+                        - clusterrolebindinglist
+                        - namespacelist
+                        - networkpolicylist
+                        - podsecuritypolicylist
+                        - limitrangelist
+                        - resourcequotalist
+                        - horizontalpodautoscalerlist
+                        - poddisruptionbudgetlist
+                        - priorityclasslist
+                        - storageclasslist
+                        - volumeattachmentlist
+                        - csidriverlist
+                        - csinodelist
+                        - customresourcedefinitionlistlist
+                        - mutatingwebhookconfigurationlistlist
+                        - validatingwebhookconfigurationlistlist
                         type: string
                       type: array
                     verbs:
                       items:
+                        enum:
+                        - get
+                        - list
+                        - watch
+                        - create
+                        - update
+                        - patch
+                        - delete
+                        - deletecollection
                         type: string
+                      minItems: 1
                       type: array
                   required:
-                  - contexts
-                  - instances
-                  - namespaces
-                  - resources
                   - verbs
                   type: object
+                minItems: 1
                 type: array
               namespaceRole:
                 properties:
@@ -95,10 +218,8 @@ spec:
                 type: object
             required:
             - clusterRole
-            - namespaceRole
             type: object
           status:
-            description: RoleStatus defines the observed state of Role
             properties:
               conditions:
                 items:
@@ -183,6 +304,8 @@ spec:
                 format: int64
                 type: integer
             type: object
+        required:
+        - spec
         type: object
     served: true
     storage: true
