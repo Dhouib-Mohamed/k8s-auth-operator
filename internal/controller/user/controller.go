@@ -86,7 +86,7 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	}
 
 	for _, role := range roles {
-		err := r.linkUserToRoleBinding(role.Name+"-namespace-role", "", rbacv1.Subject{
+		err := r.linkUserToRoleBinding(role.Name, "", rbacv1.Subject{
 			Kind:     "User",
 			Name:     user.Name,
 			APIGroup: "rbac.authorization.k8s.io",
@@ -100,7 +100,7 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 			}, err)
 		}
 		for _, namespace := range role.Status.HandledNamespaces {
-			err := r.linkUserToRoleBinding(role.Name+"-"+namespace.Namespace, namespace.Namespace, rbacv1.Subject{
+			err := r.linkUserToRoleBinding(role.Name, namespace.Namespace, rbacv1.Subject{
 				Kind:     "User",
 				Name:     user.Name,
 				APIGroup: "rbac.authorization.k8s.io",

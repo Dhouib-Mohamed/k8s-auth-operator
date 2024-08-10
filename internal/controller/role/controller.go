@@ -84,7 +84,7 @@ func (r *RoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		}, err)
 	}
 	for _, handledNs := range handledNamespaces {
-		err = r.createOrUpdateRole(CRDRole.Name+"-"+handledNs.Namespace, handledNs.Namespace, handledNs.Roles)
+		err = r.createOrUpdateRole(CRDRole.Name, handledNs.Namespace, handledNs.Roles)
 		if err != nil {
 			return r.UpdateStatus(ctx, CRDRole, nil, utils.BasicCondition{
 				Type:    contextv1.TypeNotReady,
@@ -103,7 +103,7 @@ func (r *RoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 			}
 		}
 		if !found {
-			err = r.deleteRole(CRDRole.Name+"-"+existentNs.Namespace, existentNs.Namespace)
+			err = r.deleteRole(CRDRole.Name, existentNs.Namespace)
 			if err != nil {
 				return r.UpdateStatus(ctx, CRDRole, nil, utils.BasicCondition{
 					Type:    contextv1.TypeNotReady,

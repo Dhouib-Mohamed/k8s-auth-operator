@@ -10,6 +10,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"kube-auth.io/internal/controller/utils"
 	"math/big"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"time"
@@ -71,7 +72,7 @@ users:
 
 func (r *UserReconciler) linkUserToRoleBinding(roleName string, namespace string, subject rbacv1.Subject) error {
 	var roleBinding client.Object
-	roleBindingName := roleName + "-binding"
+	roleBindingName := utils.GetRoleBindingName(roleName, namespace)
 	var err error
 	if namespace == "" {
 		roleBinding = &rbacv1.ClusterRoleBinding{}
@@ -95,7 +96,7 @@ func (r *UserReconciler) linkUserToRoleBinding(roleName string, namespace string
 					Subjects: []rbacv1.Subject{subject},
 					RoleRef: rbacv1.RoleRef{
 						Kind:     "ClusterRole",
-						Name:     roleName,
+						Name:     utils.GetRoleName(roleName, ""),
 						APIGroup: "rbac.authorization.k8s.io",
 					},
 				}
@@ -108,7 +109,7 @@ func (r *UserReconciler) linkUserToRoleBinding(roleName string, namespace string
 					Subjects: []rbacv1.Subject{subject},
 					RoleRef: rbacv1.RoleRef{
 						Kind:     "Role",
-						Name:     roleName,
+						Name:     utils.GetRoleName(roleName, namespace),
 						APIGroup: "rbac.authorization.k8s.io",
 					},
 				}
@@ -129,7 +130,7 @@ func (r *UserReconciler) linkUserToRoleBinding(roleName string, namespace string
 			Subjects: append(roleBinding.(*rbacv1.ClusterRoleBinding).Subjects, subject),
 			RoleRef: rbacv1.RoleRef{
 				Kind:     "ClusterRole",
-				Name:     roleName,
+				Name:     utils.GetRoleName(roleName, ""),
 				APIGroup: "rbac.authorization.k8s.io",
 			},
 		}
@@ -142,7 +143,7 @@ func (r *UserReconciler) linkUserToRoleBinding(roleName string, namespace string
 			Subjects: append(roleBinding.(*rbacv1.RoleBinding).Subjects, subject),
 			RoleRef: rbacv1.RoleRef{
 				Kind:     "Role",
-				Name:     roleName,
+				Name:     utils.GetRoleName(roleName, namespace),
 				APIGroup: "rbac.authorization.k8s.io",
 			},
 		}
