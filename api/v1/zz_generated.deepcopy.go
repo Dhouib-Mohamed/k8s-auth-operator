@@ -40,7 +40,7 @@ func (in *ClusterRole) DeepCopyInto(out *ClusterRole) {
 	}
 	if in.Resources != nil {
 		in, out := &in.Resources, &out.Resources
-		*out = make([]string, len(*in))
+		*out = make([]RoleResource, len(*in))
 		copy(*out, *in)
 	}
 	if in.Instances != nil {
@@ -52,7 +52,7 @@ func (in *ClusterRole) DeepCopyInto(out *ClusterRole) {
 	}
 	if in.Verbs != nil {
 		in, out := &in.Verbs, &out.Verbs
-		*out = make([]string, len(*in))
+		*out = make([]RoleVerb, len(*in))
 		copy(*out, *in)
 	}
 }
