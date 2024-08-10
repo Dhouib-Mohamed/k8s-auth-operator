@@ -13,6 +13,22 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+func convertVerbArrayToStringArray(arr []contextv1.RoleVerb) []string {
+	stringSlice := make([]string, len(arr))
+	for i, verb := range arr {
+		stringSlice[i] = string(verb)
+	}
+	return stringSlice
+}
+
+func convertResourceArrayToStringArray(arr []contextv1.RoleResource) []string {
+	stringSlice := make([]string, len(arr))
+	for i, verb := range arr {
+		stringSlice[i] = string(verb)
+	}
+	return stringSlice
+}
+
 func (r *RoleReconciler) extractHandledNamespaces(ctx context.Context, roles []contextv1.ClusterRole, namespace string) ([]contextv1.HandledNamespace, error) {
 	logger := log.FromContext(ctx)
 	var handledNamespaces []contextv1.HandledNamespace
@@ -34,17 +50,17 @@ func (r *RoleReconciler) extractHandledNamespaces(ctx context.Context, roles []c
 		var policies []rbacv1.PolicyRule
 		if role.Resources != nil && len(role.Resources) > 0 {
 			policies = append(policies, rbacv1.PolicyRule{
-				Verbs:     role.Verbs,
+				Verbs:     convertVerbArrayToStringArray(role.Verbs),
 				APIGroups: []string{"*"},
-				Resources: role.Resources,
+				Resources: convertResourceArrayToStringArray(role.Resources),
 			})
 		}
 		if role.Instances != nil {
 			for _, instance := range role.Instances {
 				policies = append(policies, rbacv1.PolicyRule{
-					Verbs:         role.Verbs,
+					Verbs:         convertVerbArrayToStringArray(role.Verbs),
 					APIGroups:     []string{"*"},
-					Resources:     []string{instance.Kind},
+					Resources:     []string{string(instance.Kind)},
 					ResourceNames: instance.Name,
 				})
 			}

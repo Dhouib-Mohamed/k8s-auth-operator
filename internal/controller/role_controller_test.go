@@ -72,9 +72,9 @@ var _ = Describe("Role Controller", func() {
 							{
 								Contexts:   []string{},
 								Namespaces: []string{namespaceName},
-								Resources:  []string{"pods"},
+								Resources:  []contextv1.RoleResource{"pods"},
 								Instances:  []contextv1.ResourceInstances{},
-								Verbs:      []string{"get", "list"},
+								Verbs:      []contextv1.RoleVerb{"get", "list"},
 							},
 						},
 					},

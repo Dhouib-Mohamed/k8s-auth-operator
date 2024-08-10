@@ -55,8 +55,8 @@ var _ = Describe("User Controller", func() {
 					ClusterRole: []contextv1.ClusterRole{
 						{
 							Namespaces: []string{namespace},
-							Resources:  []string{"pods"},
-							Verbs:      []string{"get", "list"},
+							Resources:  []contextv1.RoleResource{"pods"},
+							Verbs:      []contextv1.RoleVerb{"get", "list"},
 							Contexts:   []string{},
 							Instances:  []contextv1.ResourceInstances{},
 						},
