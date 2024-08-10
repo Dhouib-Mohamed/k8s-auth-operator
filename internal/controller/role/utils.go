@@ -90,22 +90,23 @@ func (r *RoleReconciler) createNamespacesRole(name string, nsRole contextv1.Name
 	if *nsRole.Delete {
 		rule.Verbs = append(rule.Verbs, "delete")
 	}
-	return r.createOrUpdateRole(name+"-namespace-role", "", []rbacv1.PolicyRule{rule})
+	return r.createOrUpdateRole(name, "", []rbacv1.PolicyRule{rule})
 }
 
 func (r *RoleReconciler) createOrUpdateRole(roleName string, namespace string, rules []rbacv1.PolicyRule) error {
 	var role client.Object
+	roleFullName := utils.GetRoleName(roleName, namespace)
 	if namespace == "" {
 		role = &rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: roleName,
+				Name: roleFullName,
 			},
 			Rules: rules,
 		}
 	} else {
 		role = &rbacv1.Role{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      roleName,
+				Name:      roleFullName,
 				Namespace: namespace,
 			},
 			Rules: rules,
@@ -127,10 +128,11 @@ func (r *RoleReconciler) createOrUpdateRole(roleName string, namespace string, r
 
 func (r *RoleReconciler) deleteRole(roleName string, namespace string) error {
 	var role client.Object
+	fullRoleName := utils.GetRoleName(roleName, namespace)
 	if namespace == "" {
 		role = &rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: roleName,
+				Name: fullRoleName,
 			},
 		}
 	} else {
@@ -147,7 +149,7 @@ func (r *RoleReconciler) deleteRole(roleName string, namespace string) error {
 		}
 		role = &rbacv1.Role{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      roleName,
+				Name:      fullRoleName,
 				Namespace: namespace,
 			},
 		}
